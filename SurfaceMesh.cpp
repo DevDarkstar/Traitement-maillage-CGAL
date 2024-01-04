@@ -60,15 +60,15 @@ SurfaceMesh::SurfaceMesh(const std::string objFilePath) {
     // Fermeture du fichier .obj
     objFile.close();
 
-    // Création d'une table de propriété permettant d'associer les indices des sommets appartenant à la face à la face du maillage elle-même
-    std::pair<Surface_mesh::Property_map<face_descriptor, std::vector<int>>, bool> property = m_surface_mesh.add_property_map<face_descriptor, std::vector<int>>("f:indices");
+    // Création d'une table de propriété permettant d'associer la liste des sommets appartenant à la face à la face du maillage elle-même
+    std::pair<Surface_mesh::Property_map<face_descriptor, std::vector<vertex_descriptor>>, bool> property = m_surface_mesh.add_property_map<face_descriptor, std::vector<vertex_descriptor>>("f:vertices");
     // Création d'une variable dans laquelle la table de propriété sera stockée
-    Surface_mesh::Property_map<face_descriptor, std::vector<int>> face_indices_property;
+    Surface_mesh::Property_map<face_descriptor, std::vector<vertex_descriptor>> face_vertices_property;
     // Vérification si la table de propriété s'est créée correctement
     if (!property.second) {
-        throw std::runtime_error("La table de propriété des indices des sommets relatifs à une face ne s'est pas créée correctment.");
+        throw std::runtime_error("La table de propriété de la liste des sommets relatifs à une face ne s'est pas créée correctement.");
     } else {
-        face_indices_property = property.first;
+        face_vertices_property = property.first;
     }
 
     // Création des faces du maillage par rapport aux indices des sommets récupérés
@@ -82,15 +82,15 @@ SurfaceMesh::SurfaceMesh(const std::string objFilePath) {
             // ajout de la face triangulaire aux données du maillage
             // attention à toujours retirer 1 aux indices des sommets car ils commencent à 1 dans le fichier .obj mais à 0 dans vertices_descriptor
             face_descriptor face = m_surface_mesh.add_face(vertices_descriptor[indices[0] - 1], vertices_descriptor[indices[1] - 1], vertices_descriptor[indices[2] - 1]);
-            // association des indices des sommets de la face à la face du maillage
-            face_indices_property[face] = indices;
+            // association de la liste des sommets de la face à la face du maillage
+            face_vertices_property[face] = {vertices_descriptor[indices[0] - 1], vertices_descriptor[indices[1] - 1], vertices_descriptor[indices[2] - 1]};
         }
         // Sinon s'il s'agit d'une face quadrangulaire
         else if (indices_size == 4) {
             // ajout de la face quadrangulaire aux données du maillage
             face_descriptor face = m_surface_mesh.add_face(vertices_descriptor[indices[0] - 1], vertices_descriptor[indices[1] - 1], vertices_descriptor[indices[2] - 1], vertices_descriptor[indices[3] - 1]);
-            // association des indices des sommets de la face à la face du maillage
-            face_indices_property[face] = indices;
+            // association de la liste des sommets de la face à la face du maillage
+            face_vertices_property[face] = {vertices_descriptor[indices[0] - 1], vertices_descriptor[indices[1] - 1], vertices_descriptor[indices[2] - 1], vertices_descriptor[indices[3] - 1]};
         }
         // Sinon il s'agit d'un n-gon, c'est-à-dire une face formée de n > 4 sommets. Dans ce cas, nous ne pouvons pas créer le maillage
         else {
@@ -114,7 +114,7 @@ void SurfaceMesh::displaySurfaceMeshInfos() {
     std::cout << "Nombres de faces : " << m_surface_mesh.faces().size() << std::endl;
 }
 
-void SurfaceMesh::generateVerticesValency() {
+void SurfaceMesh::calculateVerticesValency() {
     // Création d'une table de propriété associant à un sommet du maillage une valence
     std::pair<Surface_mesh::Property_map<vertex_descriptor, int>, bool> property = m_surface_mesh.add_property_map<vertex_descriptor, int>("v:valency");
     // Création d'une variable dans laquelle la table de propriété sera stockée
@@ -122,7 +122,7 @@ void SurfaceMesh::generateVerticesValency() {
 
     // Vérification si la table de propriété s'est créée correctement
     if (!property.second) {
-        throw std::runtime_error("La table de propriété de la valence des sommets ne s'est pas créée correctment.");
+        throw std::runtime_error("La table de propriété de la valence des sommets ne s'est pas créée correctement.");
     } else {
         vertices_valency = property.first;
     }
@@ -146,5 +146,176 @@ void SurfaceMesh::generateVerticesValency() {
     //Affichage des valences des sommets du maillage
     for (vertex_descriptor v : m_surface_mesh.vertices()) {
         std::cout << "Valence de " << v << " : " << vertices_valency[v] << std::endl;
+    }
+}
+
+void SurfaceMesh::exportVerticesValencyAsCSV(const std::string csvFileName) {
+    // Récupération de la table de propriété contenant les valences des sommets du maillage
+    Surface_mesh::Property_map<vertex_descriptor, int> vertices_valency = m_surface_mesh.property_map<vertex_descriptor, int>("v:valency").first;
+
+    // Comme l'objectif est de pouvoir exporter les données de sorte à pouvoir réaliser un histogramme, nous allons préparer ces dernières
+    // de sorte à pouvoir afficher un histogramme représentant le nombre de sommets en fonction de leur valence
+    // Création d'une map permettant de stocker ces nouvelles données (la clé représente la valence et la valeur le nombre de sommets ayant cette valance)
+    std::map<int, int> valency_data;
+
+    // Nous parcourons la liste des sommets du maillage
+    for (vertex_descriptor v : m_surface_mesh.vertices()) {
+        // récupération de la valence associée à ce sommet dans la table de propriété
+        int valency = vertices_valency[v];
+        // incrémentation du nombre de sommets avec cette valence dans la map
+        valency_data[valency]++;
+    }
+
+    // Création du fichier d'exportation
+    // Ouverture du fichier en mode écriture
+    std::ofstream csvOutputFile(csvFileName);
+
+    // Si le fichier ne s'est pas créé correctement
+    if (!csvOutputFile.is_open()) {
+        throw std::runtime_error("Impossible d'ouvrir le fichier CSV.");
+    // sinon il est ouvert et nous pouvons écrire à l'intérieur
+    } else {
+        // Nous commençons par écrire l'en-tête de ce fichier à savoir le titre des deux colonnes des données à exporter (valence et nombre de sommets)
+        csvOutputFile << "Valence,Nombre de sommets\n";
+        // Remplissage du fichier avec les données de valence
+        for (const auto& [key, value] : valency_data) {
+            csvOutputFile << key << "," << value << "\n";
+        }
+
+        // Fermeture du fichier CSV
+        csvOutputFile.close();
+        std::cout << "Exportation des données de valence dans le fichier CSV réussie." << std::endl;
+    }
+}
+
+void SurfaceMesh::calculateDihedralAngles() {
+    // Récupération de la table de propriété des coordonnées des sommets du maillage
+    Surface_mesh::Property_map<vertex_descriptor, Point_3> vertices_coordinates = m_surface_mesh.property_map<vertex_descriptor, Point_3>("v:point").first;
+
+    // Récupération de la table de propriété de la liste des sommets associés à chaque face du maillage
+    Surface_mesh::Property_map<face_descriptor, std::vector<vertex_descriptor>> face_vertices_property = m_surface_mesh.property_map<face_descriptor, std::vector<vertex_descriptor>>("f:vertices").first; 
+
+    // Création d'une table de propriété qui va associer à chaque face du maillage sa normale
+    std::pair<Surface_mesh::Property_map<face_descriptor, Vector_3>, bool> normal_property = m_surface_mesh.add_property_map<face_descriptor, Vector_3>("f:normal");
+
+    Surface_mesh::Property_map<face_descriptor, Vector_3> face_normal;
+
+    // Vérification si la table de propriété s'est créée correctement
+    if (!normal_property.second) {
+        throw std::runtime_error("La table de propriété des normales aux faces ne s'est pas créée correctement.");
+    } else {
+        face_normal = normal_property.first;
+    }
+
+    // Remplissage du tableau des normales aux faces
+    for (face_descriptor face : m_surface_mesh.faces()) {
+        // Récupération de la liste des sommets associés à cette face
+        std::vector<vertex_descriptor> vertices = face_vertices_property[face];
+
+        // Calcul de deux vecteurs de cette face
+        Vector_3 v1 = vertices_coordinates[vertices[1]] - vertices_coordinates[vertices[0]];
+        Vector_3 v2 = vertices_coordinates[vertices[2]] - vertices_coordinates[vertices[0]];
+
+        // Calcul du vecteur normal à cette face
+        Vector_3 normal = CGAL::cross_product(v1, v2);
+
+        // Stockage de la normale à cette face dans la table de propriété associée
+        face_normal[face] = normal;
+    }
+
+    // Détermination des faces adjacentes à une face donnée
+    // Création d'une table de propriété qui va associer à chaque face du maillage les faces qui lui sont adjacentes et ayant un indice supérieur à cette dernière
+    std::pair<Surface_mesh::Property_map<face_descriptor, std::vector<face_descriptor>>, bool> adjacent_property = m_surface_mesh.add_property_map<face_descriptor, std::vector<face_descriptor>>("f:adjacent");
+
+    Surface_mesh::Property_map<face_descriptor, std::vector<face_descriptor>> adjacent_faces;
+
+    // Vérification si la table de propriété s'est créée correctement
+    if (!adjacent_property.second) {
+        throw std::runtime_error("La table de propriété des faces adjacentes ne s'est pas créée correctement.");
+    } else {
+        adjacent_faces = adjacent_property.first;
+    }
+
+    // La stratégie ici est de définir que deux faces sont adjacentes si elles possèdent deux sommets en commun
+    // Parcours des faces du maillage 
+    for (face_descriptor face : m_surface_mesh.faces()) {
+        // Récupération des sommets de cette face
+        std::vector<vertex_descriptor> current_face_vertices = face_vertices_property[face];
+        // Création d'un itérateur sur la liste des faces du maillage à partir de cette face
+        auto it = std::find(m_surface_mesh.faces().begin(), m_surface_mesh.faces().end(), face);
+        // Vérification s'il ne s'agit pas de la dernière face du maillage
+        if (it != m_surface_mesh.faces().end()) {
+            // Incrémentation de l'itérateur afin d'exclure la face courante
+            std::advance(it, 1);
+            // Parcours de la liste des faces juusq'à la fin
+            while(it != m_surface_mesh.faces().end()) {
+                // Récupération des sommets de cette face
+                std::vector<vertex_descriptor> vertices = face_vertices_property[*it];
+                // Création d'un compteur de sommets similaires
+                int same_vertices_count = 0;
+                // Parcours des tableaux de sommets de la face courante et de cette face afin de
+                // déterminer si elles sont adjacentes
+                for (vertex_descriptor v1 : current_face_vertices) {
+                    for (vertex_descriptor v2 : vertices) {
+                        if (v1 == v2) {
+                            same_vertices_count++;
+                        }
+                    }
+                }
+
+                // Si le nombre de sommets en commun est supérieur ou égal à deux, les deux faces sont adjacentes
+                // et nous ajoutons cette face à la liste des faces adjacentes à la face courante
+                if (same_vertices_count >= 2) {
+                    adjacent_faces[face].push_back(*it);
+                }
+                // incrémentation de l'itérateur
+                std::advance(it, 1);
+            }
+
+        }
+    }
+
+    // Création d'une table de propriété qui va associer à chaque face du maillage les angles dièdres des faces qui lui sont adjacentes
+    std::pair<Surface_mesh::Property_map<face_descriptor, std::vector<double>>, bool> dihedral_property = m_surface_mesh.add_property_map<face_descriptor, std::vector<double>>("f:dihedral_angles");
+
+    Surface_mesh::Property_map<face_descriptor, std::vector<double>> dihedral_angles;
+
+    // Vérification si la table de propriété s'est créée correctement
+    if (!dihedral_property.second) {
+        throw std::runtime_error("La table de propriété des angles dièdres ne s'est pas créée correctement.");
+    } else {
+        dihedral_angles = dihedral_property.first;
+    }
+
+    // Remplissage de la table de propriété
+    for(face_descriptor face : m_surface_mesh.faces()) {
+        // Récupération de la normale de la face courante
+        Vector_3 current_normal = face_normal[face];
+        // Calcul de la norme de ce vecteur
+        double current_norm = CGAL::sqrt(current_normal.squared_length());
+        // Récupération des faces adjacentes à celle-ci
+        std::vector<face_descriptor> faces = adjacent_faces[face];
+
+        for(face_descriptor adjacent_face : faces) {
+            // Récupération de la normale de cette face
+            Vector_3 normal = face_normal[adjacent_face];
+            // Calcul de la norme de ce vecteur
+            double norm = CGAL::sqrt(normal.squared_length());
+            // Calcul de l'angle dièdre entre cette face et la face courante en degrés
+            double dihedral_angle = std::acos((current_normal * normal) / (current_norm * norm)) * 180 / CGAL_PI;
+            // Ajout de l'angle dièdre à la table de propriété
+            dihedral_angles[face].push_back(dihedral_angle);
+        } 
+    }
+
+    // Affichage des angles dièdres des faces adjacentes
+    for (face_descriptor face : m_surface_mesh.faces()) {
+        std::cout << "Faces adjacentes à " << face << " : ";
+        std::vector<face_descriptor>::iterator adjacent_face = adjacent_faces[face].begin();
+        std::vector<double>::iterator dihedral_angle = dihedral_angles[face].begin();
+        for (; adjacent_face != adjacent_faces[face].end() && dihedral_angle != dihedral_angles[face].end(); ++adjacent_face, ++dihedral_angle) {
+            std::cout << *adjacent_face << " d'angle dièdre : " << *dihedral_angle << "°, ";
+        }
+        std::cout << std::endl;
     }
 }

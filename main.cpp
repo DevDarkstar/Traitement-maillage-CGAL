@@ -17,7 +17,11 @@ int main(int argc, char* argv[]){
     // Affichage du nombre de sommets et de faces du maillage
     surface_mesh.displaySurfaceMeshInfos();
     // Calcul de la valence de chaque sommet du maillage
-    surface_mesh.generateVerticesValency();
+    surface_mesh.calculateVerticesValency();
+    // Exportation des valences des sommets au format CSV
+    surface_mesh.exportVerticesValencyAsCSV("../valency.csv");
+    // Calcul des angles dièdres des faces adjacentes entre elles
+    surface_mesh.calculateDihedralAngles();
 
     return 0;
 }
