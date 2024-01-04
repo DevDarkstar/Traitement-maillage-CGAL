@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <map>
 #include <iterator>
+#include <cmath>
 
 #include <CGAL/Simple_cartesian.h>
 #include <CGAL/Surface_mesh.h>
@@ -29,6 +30,8 @@ class SurfaceMesh{
     void calculateVerticesValency(); // Calcul de la valence des sommets du maillage
     void exportVerticesValencyAsCSV(const std::string csvFileName); // Exportation des valences des sommets du maillage au format CSV
     void calculateDihedralAngles(); // Calcul des angles dièdres entre les faces adjacentes entre elles
+    void exportDihedralAnglesAsCSV(const std::string csvFileName); // Exportation des valeurs des angles dièdres en fonction du nombre d'occurrences au format CSV
+    void calculateAreaOfFaces(); // Calcul de l'aire des faces du maillage
 
     private:
     Surface_mesh m_surface_mesh;

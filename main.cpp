@@ -22,6 +22,10 @@ int main(int argc, char* argv[]){
     surface_mesh.exportVerticesValencyAsCSV("../valency.csv");
     // Calcul des angles dièdres des faces adjacentes entre elles
     surface_mesh.calculateDihedralAngles();
+    // Exportation des valeurs des angles dièdres en fonction de leur nombre d'occurrences au format CSV
+    surface_mesh.exportDihedralAnglesAsCSV("../dihedral_angles.csv");
+    // Calcul de l'aire des faces du maillage
+    surface_mesh.calculateAreaOfFaces();
 
     return 0;
 }

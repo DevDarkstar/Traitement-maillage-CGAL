@@ -319,3 +319,114 @@ void SurfaceMesh::calculateDihedralAngles() {
         std::cout << std::endl;
     }
 }
+
+void SurfaceMesh::exportDihedralAnglesAsCSV(const std::string csvFileName) {
+    // Récupération de la table de propriété contenant les angles dièdres entre les faces adjacentes du maillage
+    Surface_mesh::Property_map<face_descriptor, std::vector<double>> dihedral_angles = m_surface_mesh.property_map<face_descriptor, std::vector<double>>("f:dihedral_angles").first;
+
+    // Comme l'objectif est de pouvoir exporter les données de sorte à pouvoir réaliser un histogramme, nous allons préparer ces dernières
+    // de sorte à pouvoir afficher un histogramme représentant le nombre d'occurences ayant une certaine valeur d'angle
+    // De plus, afin de limiter la taille de l'histogramme, nous allons arrondir les valeurs d'angles obtenues à l'entier le plus proche
+    // Création d'une map permettant de stocker ces nouvelles données (la clé représente la valeur de l'angle dièdre et la valeur le nombre d'occurrences trouvées ayant cet angle)
+    std::map<int, int> dihedral_angles_data;
+
+    // Nous parcourons la liste des faces du maillage
+    for (face_descriptor face : m_surface_mesh.faces()) {
+        // récupération de la liste des angles dièdres associés à cette face
+        std::vector<double> angles = dihedral_angles[face];
+        // Parcours de la liste de ces angles
+        for(double angle : angles) {
+            // arrondissement de la valeur de l'angle dièdre à l'entier le plus proche
+            int rounded_angle = (int)std::round(angle);
+            // incrémentation du nombre d'occurrences avec cette valeur d'angle
+            dihedral_angles_data[rounded_angle]++;
+        }     
+    }
+
+    // Création du fichier d'exportation
+    // Ouverture du fichier en mode écriture
+    std::ofstream csvOutputFile(csvFileName);
+
+    // Si le fichier ne s'est pas créé correctement
+    if (!csvOutputFile.is_open()) {
+        throw std::runtime_error("Impossible d'ouvrir le fichier CSV.");
+    // sinon il est ouvert et nous pouvons écrire à l'intérieur
+    } else {
+        // Nous commençons par écrire l'en-tête de ce fichier à savoir le titre des deux colonnes des données à exporter (angle dièdre et nombre d'occurrences)
+        csvOutputFile << "Angle dièdre,Nombre d'occurrences\n";
+        // Remplissage du fichier avec les données des angles dièdres
+        for (const auto& [key, value] : dihedral_angles_data) {
+            csvOutputFile << key << "," << value << "\n";
+        }
+
+        // Fermeture du fichier CSV
+        csvOutputFile.close();
+        std::cout << "Exportation des données de valence dans le fichier CSV réussie." << std::endl;
+    }
+}
+
+void SurfaceMesh::calculateAreaOfFaces() {
+    // Récupération de la table de propriété des coordonnées des sommets du maillage
+    Surface_mesh::Property_map<vertex_descriptor, Point_3> vertices_coordinates = m_surface_mesh.property_map<vertex_descriptor, Point_3>("v:point").first;
+
+    // Récupération de la table de propriété de la liste des sommets associés à chaque face du maillage
+    Surface_mesh::Property_map<face_descriptor, std::vector<vertex_descriptor>> face_vertices_property = m_surface_mesh.property_map<face_descriptor, std::vector<vertex_descriptor>>("f:vertices").first;
+
+    // Création d'une table de propriété qui va associer à chaque face du maillage son aire
+    std::pair<Surface_mesh::Property_map<face_descriptor, double>, bool> area_property = m_surface_mesh.add_property_map<face_descriptor, double>("f:area");
+
+    Surface_mesh::Property_map<face_descriptor, double> face_area;
+
+    // Vérification si la table de propriété s'est créée correctement
+    if (!area_property.second) {
+        throw std::runtime_error("La table de propriété des aires des faces ne s'est pas créée correctement.");
+    } else {
+        face_area = area_property.first;
+    }
+
+    // Parcours de la liste des faces du maillage
+    for (face_descriptor face : m_surface_mesh.faces()) {
+        // Récupération de la liste des sommets de cette face
+        std::vector<vertex_descriptor> vertices = face_vertices_property[face];
+        // Si la face est triangulaire
+        if (vertices.size() == 3) {
+            // Récupération des coordonnées des trois sommets de la face
+            Point_3 v1 =  vertices_coordinates[vertices[0]];
+            Point_3 v2 =  vertices_coordinates[vertices[1]];
+            Point_3 v3 =  vertices_coordinates[vertices[2]];
+
+            // Calcul de l'aire du triangle en utilisant la formule suivante
+            //                |     | x1 y1 z1 ||
+            // Aire = 1 / 2 * | det | x2 y2 z2 ||
+            //                |     | x3 y3 z3 ||
+
+            double area = 0.5 * CGAL::abs(v1.x()*v2.y()*v3.z() - v1.x()*v3.y()*v2.z() - v2.x()*v1.y()*v3.z() + v2.x()*v3.y()*v1.z() + v3.x()*v1.y()*v2.z() - v3.x()*v2.y()*v1.z());
+
+            // Stockage de l'aire de la face résultante dans la table de propriété
+            face_area[face] = area;
+        }
+        // Sinon elle est quadrangulaire
+        else {
+            // Récupération des coordonnées des quatre sommets de la face
+            Point_3 v1 =  vertices_coordinates[vertices[0]];
+            Point_3 v2 =  vertices_coordinates[vertices[1]];
+            Point_3 v3 =  vertices_coordinates[vertices[2]];
+            Point_3 v4 =  vertices_coordinates[vertices[3]];
+
+            // Calcul de l'aire de la face en la subdivisant en deux faces triangulaires, puis calcul de l'aire des deux triangles
+            // L'aire de la face quadrangulaire correspondra à la somme de ces deux aires
+            // Première aire en prenant les sommets v1, v2 et v3
+            double area1 = 0.5 * CGAL::abs(v1.x()*v2.y()*v3.z() - v1.x()*v3.y()*v2.z() - v2.x()*v1.y()*v3.z() + v2.x()*v3.y()*v1.z() + v3.x()*v1.y()*v2.z() - v3.x()*v2.y()*v1.z());
+            // Seconde aire en prenant les sommets v3, v4 et v1
+            double area2 = 0.5 * CGAL::abs(v3.x()*v4.y()*v1.z() - v3.x()*v1.y()*v4.z() - v4.x()*v3.y()*v1.z() + v4.x()*v1.y()*v3.z() + v1.x()*v3.y()*v4.z() - v1.x()*v4.y()*v3.z());
+
+            // Stockage de l'aire de la face résultante dans la table de propriété
+            face_area[face] = area1 + area2;
+        }
+    }
+
+    // Affichage de l'aire des faces du maillage
+    for(face_descriptor face : m_surface_mesh.faces()) {
+        std::cout << "Face " << face << " : aire = " << face_area[face] << " m²" << std::endl;
+    }
+}
