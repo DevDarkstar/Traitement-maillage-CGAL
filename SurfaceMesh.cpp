@@ -344,6 +344,9 @@ void SurfaceMesh::displayFaceAreaInfos() {
 void SurfaceMesh::computeGaussianCurvature() {
     // La technique utilisée ici est une approche en approximant la courbure gaussienne de chaque sommet du maillage en utilisant 
     // les normales et les aires des faces
+    // Comme nous allons utiliser l'aire des faces dans ce calcul et que le résultat de la courbure y est directement lié,
+    // nous devons donc normaliser les courbures gaussiennes résultantes afin de pouvoir généraliser le code couleur de la carte de courbure gaussienne
+    // à des maillages de tailles diverses
 
     // Calcul des approximations de courbure gaussienne (le résultat sera stocké dans la table de propriété m_vertex_gaussian_curvature)
     // Parcours de l'ensemble des sommets du maillage 
@@ -377,7 +380,7 @@ void SurfaceMesh::computeGaussianCurvature() {
                 double n1_norm = CGAL::sqrt(n1.squared_length());
                 double n2_norm = CGAL::sqrt(n2.squared_length());
                 // Calcul de l'angle entre les deux normales en radian
-                double angle = std::acos((CGAL::abs(n1 * n2)) / (n1_norm * n2_norm));
+                double angle = std::acos((n1 * n2) / (n1_norm * n2_norm));
                 // Ajout du résultat à la somme des angles obtenus
                 angle_sum += angle;
             }
@@ -386,11 +389,28 @@ void SurfaceMesh::computeGaussianCurvature() {
                 area_sum += m_face_area[face];
             }
         }
-
+        //std::cout << vertex << " somme des angles : " << angle_sum << ", somme des aires : " << area_sum << std::endl;
         // Calcul de l'approximation de la courbure gaussienne pour ce sommet
         double gaussian_curvature = (2 * CGAL_PI - angle_sum) / area_sum;
         // et ajout du résultat à la table de propriété
+        if(std::isnan(gaussian_curvature)) {
+            gaussian_curvature = 0.0;
+        }
         m_vertex_gaussian_curvature[vertex] = gaussian_curvature;
+    }
+
+    // Création d'une variable contenant la somme des courbures gaussiennes des sommets
+    double sum = 0.0;
+
+    for (vertex_descriptor v : m_surface_mesh.vertices()) {
+        sum += m_vertex_gaussian_curvature[v];
+    }
+
+    double average_area = sum / m_surface_mesh.number_of_faces();
+
+    // Normalisation des valeurs 
+    for (vertex_descriptor v : m_surface_mesh.vertices()) {
+        m_vertex_gaussian_curvature[v] /= average_area;
     }
 
     // Affichage des résultats
@@ -415,7 +435,7 @@ void SurfaceMesh::exportGaussianCurvatureAsOBJ(const std::string objFileName) {
     // sinon il est ouvert et nous pouvons écrire à l'intérieur
     } else {
         // Nous commençons par écrire l'en-tête de ce fichier
-        objOutputFile << "#OBJ file created by Richard Leestmans\n#https://github.com/DevDarkstar/Traitement-maillage-CGAL\no Mesh\n";
+        objOutputFile << "# OBJ file generated with gaussian curvature infos\n# https://github.com/DevDarkstar/Traitement-maillage-CGAL\no Mesh\n";
         // Remplissage du fichier avec les coordonnées des sommets du maillage ainsi que les couleurs déterminées selon la courbure gaussienne
         for (vertex_descriptor v : m_surface_mesh.vertices()) {
             // Récupération des coordonnées du sommet
@@ -426,27 +446,45 @@ void SurfaceMesh::exportGaussianCurvatureAsOBJ(const std::string objFileName) {
             // Récupération de la courbure gaussienne de ce sommet
             double gaussian_curvature = m_vertex_gaussian_curvature[v];
             // et stockage de la couleur associée à ce sommet en angle de la courbure
-            // Si la valeur est supérieur strictement à 5000, le sommet sera vert
-            if (gaussian_curvature > 5000) {
+            // Si la valeur est supérieur strictement à 0.9, le sommet sera blanc
+            if (gaussian_curvature > 5) {
+                objOutputFile << 1 << " " << 1 << " " << 1 << "\n";
+            }
+            // Sinon si la valeur est supérieur strictement à 0.8 et le sommet sera de couleur magenta
+            else if (gaussian_curvature > 3) {
                 objOutputFile << 1 << " " << 0 << " " << 1 << "\n";
             }
-            else if (gaussian_curvature > 2500) {
+            // Sinon si la valeur est supérieur strictement à 0.7 et le sommet sera de couleur rouge
+            else if (gaussian_curvature > 1.5) {
                 objOutputFile << 1 << " " << 0 << " " << 0 << "\n";
             }
-            else if (gaussian_curvature > 1000) {
+            // Sinon si la valeur est supérieur strictement à 0.6 et le sommet sera de couleur orange
+            else if (gaussian_curvature > 1) {
                 objOutputFile << 1 << " " << 0.5 << " " << 0 << "\n";
             }
-            else if (gaussian_curvature > 500) {
+            // Sinon si la valeur est supérieur strictement à 0.5 et le sommet sera de couleur jaune
+            else if (gaussian_curvature > 0.75) {
                 objOutputFile << 1 << " " << 1 << " " << 0 << "\n";
             }
-            else if (gaussian_curvature > 250) {
+            // Sinon si la valeur est supérieur strictement à 0.4 et le sommet sera de couleur vert clair
+            else if (gaussian_curvature > 0.5) {
+                objOutputFile << 0.5 << " " << 1 << " " << 0 << "\n";
+            }
+            // Sinon si la valeur est supérieur strictement à 0.3 et le sommet sera de couleur verte
+            else if (gaussian_curvature > 0.25) {
                 objOutputFile << 0 << " " << 1 << " " << 0 << "\n";
             }
-            else if (gaussian_curvature > 100) {
+            // Sinon si la valeur est supérieur strictement à 0.2 et le sommet sera de couleur cyan
+            else if (gaussian_curvature > 0.125) {
                 objOutputFile << 0 << " " << 1 << " " << 1 << "\n";
             }
-            else {
+            // Sinon si la valeur est supérieur strictement à 0.1 et le sommet sera de couleur bleue
+            else if (gaussian_curvature > 0.075) {
                 objOutputFile << 0 << " " << 0 << " " << 1 << "\n";
+            }
+            // Sinon le sommet sera de couleur noire
+            else {
+                objOutputFile << 0 << " " << 0 << " " << 0 << "\n";
             }
         }
 

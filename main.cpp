@@ -18,6 +18,7 @@ int main(int argc, char* argv[]){
     surface_mesh.displaySurfaceMeshInfos();
     // Calcul de la valence de chaque sommet du maillage
     surface_mesh.computeVerticesValency();
+    surface_mesh.displayValencyInfos();
     // Exportation des valences des sommets au format CSV
     surface_mesh.exportVerticesValencyAsCSV("../valency.csv");
     // Calcul des angles dièdres des faces adjacentes entre elles
@@ -30,7 +31,7 @@ int main(int argc, char* argv[]){
     // Calcul de l'approximation de la courbure gaussienne à chaque sommet du maillage
     surface_mesh.computeGaussianCurvature();
     // Exportation du maillage avec un code couleur associé aux courbures gaussiennes de chaque sommet dans un fichier OBJ
-    surface_mesh.exportGaussianCurvatureAsOBJ("../mesh_with_gaussian_curvature.obj");
+    surface_mesh.exportGaussianCurvatureAsOBJ("../gaussian_curvature.obj");
 
     return 0;
 }
