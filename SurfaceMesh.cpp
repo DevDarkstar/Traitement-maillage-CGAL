@@ -216,11 +216,11 @@ void SurfaceMesh::computeDihedralAngles() {
     }
 
     // Détermination des faces adjacentes à une face donnée qui seront stockées dans la table de propriété m_adjacent_faces
+    m_adjacent_faces.clear();
     // La stratégie ici est de parcourir l'ensemble des demi-arêtes d'une face et de définir les faces adjacentes en prenant les demi-arêtes opposées
     // à ces dernières (fonction de CGAL faces_aroud_face)
     // Parcours des faces du maillage 
     for (face_descriptor current_face : m_surface_mesh.faces()) {
-        m_adjacent_faces[current_face].clear();
         // Parcours des demi-arêtes de cette face
         for (face_descriptor face : faces_around_face(m_surface_mesh.halfedge(current_face), m_surface_mesh)) {
             if (face > current_face) {
@@ -612,14 +612,14 @@ void SurfaceMesh::exportGaussianCurvatureAsOBJ(const std::string objFileName, bo
         }
         // Sinon nous utilisons un autre système d'indices des sommets (cas après l'algorithme de décimation)
         else {
-            // Récupération des indices des sommets après l'algorithme de décimation
+            // Récupération des nouveaux indices des sommets restants après l'algorithme de décimation
             std::map<vertex_descriptor, int> vertex_indices = this->getIndicesRemapping();
+
             for(face_descriptor f : m_surface_mesh.faces()) {
-                //Récupération des sommets composants cette face
-                std::vector<vertex_descriptor> vertices = m_face_vertices[f];
                 // Et écriture de leur indice dans le fichier en utilisant les nouvelles valeurs contenues dans vertex_indices
                 objOutputFile << "f ";
-                for(vertex_descriptor v : vertices) {
+                // Pour ce faire, nous reparcourons les sommets composant une face en utilisant cette fois le méthode vertices_around_face
+                for(vertex_descriptor v : vertices_around_face(m_surface_mesh.halfedge(f), m_surface_mesh)) {
                     objOutputFile << vertex_indices[v] << " ";
                 }
                 objOutputFile << "\n";
@@ -646,7 +646,6 @@ void SurfaceMesh::triangulated_surface_mesh_simplification(){
     int r = SMS::edge_collapse(m_surface_mesh, stop);
     std::chrono::steady_clock::time_point end_time = std::chrono::steady_clock::now();
     std::cout << "\nFinished!\n" << r << " edges removed.\n" << m_surface_mesh.number_of_edges() << " final edges.\n";
-    std::cout << m_surface_mesh.number_of_vertices() << " final vertices.\n";
     std::cout << "Time elapsed: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() << "ms" << std::endl;
     std::cout << std::endl;
 }

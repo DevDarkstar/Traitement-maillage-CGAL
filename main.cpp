@@ -29,8 +29,8 @@ int main(int argc, char* argv[]){
     // Exportation des valences des sommets au format CSV
     surface_mesh.exportVerticesValencyAsCSV("../valency.csv");
     // Calcul des angles dièdres des faces adjacentes entre elles
-    //surface_mesh.computeDihedralAngles();
-    surface_mesh.displayDihedralAnglesInfos();
+    surface_mesh.computeDihedralAngles();
+    //surface_mesh.displayDihedralAnglesInfos();
     // Exportation des valeurs des angles dièdres en fonction de leur nombre d'occurrences au format CSV
     surface_mesh.exportDihedralAnglesAsCSV("../dihedral_angles.csv");
     // Calcul de l'aire des faces du maillage
@@ -61,7 +61,7 @@ int main(int argc, char* argv[]){
     // Calcul de l'approximation de la courbure gaussienne à chaque sommet du maillage
     surface_mesh.computeGaussianCurvature();
     // Exportation du maillage avec un code couleur associé aux courbures gaussiennes de chaque sommet dans un fichier OBJ
-    surface_mesh.exportGaussianCurvatureAsOBJ("../gaussian_curvature.obj", false);
+    surface_mesh.exportGaussianCurvatureAsOBJ("../gaussian_curvature_decimated.obj", false);
 
     return 0;
 }
