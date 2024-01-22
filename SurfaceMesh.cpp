@@ -161,7 +161,7 @@ void SurfaceMesh::exportVerticesValencyAsCSV(const std::string csvFileName) {
 
         // Fermeture du fichier CSV
         csvOutputFile.close();
-        std::cout << "Exportation des données de valence dans le fichier CSV réussie." << std::endl;
+        std::cout << "Exportation des données de valence réussie." << std::endl;
     }
 }
 
@@ -220,7 +220,7 @@ void SurfaceMesh::computeDihedralAngles() {
             Vector_3 normal = m_face_normal[adjacent_face];
             // Calcul de la norme de ce vecteur
             double norm = CGAL::sqrt(normal.squared_length());
-            // Calcul de l'angle dièdre entre cette face et la face courante en degrés
+            // Calcul de l'angle dièdre entre cette face et la face courante en degrés (compris entre 0 et 180°)
             double dihedral_angle = std::acos((current_normal * normal) / (current_norm * norm)) * 180 / CGAL_PI;
             // Ajout de l'angle dièdre à la table de propriété
             m_dihedral_angles[face].push_back(dihedral_angle);
@@ -247,8 +247,16 @@ void SurfaceMesh::exportDihedralAnglesAsCSV(const std::string csvFileName) {
     // Comme l'objectif est de pouvoir exporter les données de sorte à pouvoir réaliser un histogramme, nous allons préparer ces dernières
     // de sorte à pouvoir afficher un histogramme représentant le nombre d'occurences ayant une certaine valeur d'angle
     // De plus, afin de limiter la taille de l'histogramme, nous allons arrondir les valeurs d'angles obtenues à l'entier le plus proche
-    // Création d'une map permettant de stocker ces nouvelles données (la clé représente la valeur de l'angle dièdre et la valeur le nombre d'occurrences trouvées ayant cet angle)
+    // Création d'une map permettant de stocker ces nouvelles données (la clé représente un intervalle de valeurs d'angle dièdre et la valeur le nombre d'occurrences trouvées dans cet intervalle)
     std::map<int, int> dihedral_angles_data;
+    // Création d'un tableau contenant les descriptions d'intervalles et qui seront utilisés pour créer le fichier csv
+    std::vector<std::string> intervals = {"[0;5[","[5;10[","[10;15[","[15;20[","[20;25[","[25;30[","[30;35[","[35;40[","[40;45[","[45;50[","[50;55[","[55;60[","[60;65[","[65;70[","[70;75[","[75;80[","[80;85[","[85;90[",
+    "[90;95[","[95;100[","[100;105[","[105;110[","[110;115[","[115;120[","[120;125[","[125;130[","[125;130[","[130;135[","[135;140[","[140;145[","[145;150[","[150;155[","[155;160[","[160;165[","[165;170[","[170;175[","[175;180]"};
+
+    //Initialisation des valeurs pour les données des angles dièdres
+    for(int i = 0; i < intervals.size(); i++){
+        dihedral_angles_data[i] = 0;
+    }
 
     // Nous parcourons la liste des faces du maillage
     for (face_descriptor face : m_surface_mesh.faces()) {
@@ -258,8 +266,79 @@ void SurfaceMesh::exportDihedralAnglesAsCSV(const std::string csvFileName) {
         for(double angle : angles) {
             // arrondissement de la valeur de l'angle dièdre à l'entier le plus proche
             int rounded_angle = (int)std::round(angle);
-            // incrémentation du nombre d'occurrences avec cette valeur d'angle
-            dihedral_angles_data[rounded_angle]++;
+            // incrémentation du nombre d'occurrences avec cette valeur d'angle dans l'intervalle correspondant
+            if(rounded_angle < 5)
+                dihedral_angles_data[0]++;
+            else if (rounded_angle < 10)
+                dihedral_angles_data[1]++;
+            else if (rounded_angle < 15)
+                dihedral_angles_data[2]++;
+            else if (rounded_angle < 20)
+                dihedral_angles_data[3]++;
+            else if (rounded_angle < 25)
+                dihedral_angles_data[4]++;
+            else if (rounded_angle < 30)
+                dihedral_angles_data[5]++;
+            else if (rounded_angle < 35)
+                dihedral_angles_data[6]++;
+            else if (rounded_angle < 40)
+                dihedral_angles_data[7]++;
+            else if (rounded_angle < 45)
+                dihedral_angles_data[8]++;
+            else if (rounded_angle < 50)
+                dihedral_angles_data[9]++;
+            else if (rounded_angle < 55)
+                dihedral_angles_data[10]++;
+            else if (rounded_angle < 60)
+                dihedral_angles_data[11]++;
+            else if (rounded_angle < 65)
+                dihedral_angles_data[12]++;
+            else if (rounded_angle < 70)
+                dihedral_angles_data[13]++;
+            else if (rounded_angle < 75)
+                dihedral_angles_data[14]++;
+            else if (rounded_angle < 80)
+                dihedral_angles_data[15]++;
+            else if (rounded_angle < 85)
+                dihedral_angles_data[16]++;
+            else if (rounded_angle < 90)
+                dihedral_angles_data[17]++;
+            else if (rounded_angle < 95)
+                dihedral_angles_data[18]++;
+            else if (rounded_angle < 100)
+                dihedral_angles_data[19]++;
+            else if (rounded_angle < 105)
+                dihedral_angles_data[20]++;
+            else if (rounded_angle < 110)
+                dihedral_angles_data[21]++;
+            else if (rounded_angle < 115)
+                dihedral_angles_data[22]++;
+            else if (rounded_angle < 120)
+                dihedral_angles_data[23]++;
+            else if (rounded_angle < 125)
+                dihedral_angles_data[24]++;
+            else if (rounded_angle < 130)
+                dihedral_angles_data[25]++;
+            else if (rounded_angle < 135)
+                dihedral_angles_data[26]++;
+            else if (rounded_angle < 140)
+                dihedral_angles_data[27]++;
+            else if (rounded_angle < 145)
+                dihedral_angles_data[28]++;
+            else if (rounded_angle < 150)
+                dihedral_angles_data[29]++;
+            else if (rounded_angle < 155)
+                dihedral_angles_data[30]++;
+            else if (rounded_angle < 160)
+                dihedral_angles_data[31]++;
+            else if (rounded_angle < 165)
+                dihedral_angles_data[32]++;
+            else if (rounded_angle < 170)
+                dihedral_angles_data[33]++;
+            else if (rounded_angle < 175)
+                dihedral_angles_data[34]++;
+            else
+                dihedral_angles_data[35]++;
         }     
     }
 
@@ -273,15 +352,17 @@ void SurfaceMesh::exportDihedralAnglesAsCSV(const std::string csvFileName) {
     // sinon il est ouvert et nous pouvons écrire à l'intérieur
     } else {
         // Nous commençons par écrire l'en-tête de ce fichier à savoir le titre des deux colonnes des données à exporter (angle dièdre et nombre d'occurrences)
-        csvOutputFile << "Angle dièdre,Nombre d'occurrences\n";
+        csvOutputFile << "Intervalle angle dièdre,Nombre d'occurrences\n";
         // Remplissage du fichier avec les données des angles dièdres
-        for (const auto& [key, value] : dihedral_angles_data) {
-            csvOutputFile << key << "," << value << "\n";
+        std::vector<std::string>::iterator it_keys = intervals.begin();
+        std::map<int, int>::iterator it_values = dihedral_angles_data.begin();
+        for(; it_keys != intervals.end() && it_values != dihedral_angles_data.end(); ++it_keys, ++it_values) {
+            csvOutputFile << *it_keys << "," << (*it_values).second << "\n";
         }
 
         // Fermeture du fichier CSV
         csvOutputFile.close();
-        std::cout << "Exportation des données de valence dans le fichier CSV réussie." << std::endl;
+        std::cout << "Exportation des données des angles dièdres réussie." << std::endl;
     }
 }
 
