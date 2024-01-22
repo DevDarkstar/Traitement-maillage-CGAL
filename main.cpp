@@ -5,25 +5,32 @@
 int main(int argc, char* argv[]){
     // Récupération du nom du fichier .obj
     std::string objFilePath;
-    if (argc != 2) {
-        std::cerr << "Vous devez passer le nom du fichier .obj à lire à l'execution du programme.";
+    float decimation_factor;
+    if (argc != 3) {
+        std::cerr << "Vous devez passer le nom du fichier .obj à lire à l'execution du programme, ainsi que le facteur de décimation.";
         return 1;
     } else {
         objFilePath = argv[1];
+        float value = std::stof(argv[2]);
+        if (value < 0 || value > 1) {
+            std::cerr << "Le facteur de décimation est un nombre décimal compris entre 0 et 1.";
+        }
+        else 
+            decimation_factor = value;
     }
 
     // Création d'un maillage de type SurfaceMesh
-    SurfaceMesh surface_mesh(objFilePath);
+    SurfaceMesh surface_mesh(objFilePath, decimation_factor);
     // Affichage du nombre de sommets et de faces du maillage
     surface_mesh.displaySurfaceMeshInfos();
     // Calcul de la valence de chaque sommet du maillage
     surface_mesh.computeVerticesValency();
-    surface_mesh.displayValencyInfos();
+    //surface_mesh.displayValencyInfos();
     // Exportation des valences des sommets au format CSV
     surface_mesh.exportVerticesValencyAsCSV("../valency.csv");
     // Calcul des angles dièdres des faces adjacentes entre elles
-    surface_mesh.computeDihedralAngles();
-    //surface_mesh.displayDihedralAnglesInfos();
+    //surface_mesh.computeDihedralAngles();
+    surface_mesh.displayDihedralAnglesInfos();
     // Exportation des valeurs des angles dièdres en fonction de leur nombre d'occurrences au format CSV
     surface_mesh.exportDihedralAnglesAsCSV("../dihedral_angles.csv");
     // Calcul de l'aire des faces du maillage
@@ -31,7 +38,30 @@ int main(int argc, char* argv[]){
     // Calcul de l'approximation de la courbure gaussienne à chaque sommet du maillage
     surface_mesh.computeGaussianCurvature();
     // Exportation du maillage avec un code couleur associé aux courbures gaussiennes de chaque sommet dans un fichier OBJ
-    surface_mesh.exportGaussianCurvatureAsOBJ("../gaussian_curvature.obj");
+    surface_mesh.exportGaussianCurvatureAsOBJ("../gaussian_curvature.obj", true);
+
+    //Application d'un algorithme de décimation au maillage
+    surface_mesh.triangulated_surface_mesh_simplification();
+
+    //Réapplication de l'ensemble des opérations précédentes sur le maillage résultant
+    // Affichage du nombre de sommets et de faces du maillage
+    surface_mesh.displaySurfaceMeshInfos();
+    // Calcul de la valence de chaque sommet du maillage
+    surface_mesh.computeVerticesValency();
+    //surface_mesh.displayValencyInfos();
+    // Exportation des valences des sommets au format CSV
+    surface_mesh.exportVerticesValencyAsCSV("../valency_decimated.csv");
+    // Calcul des angles dièdres des faces adjacentes entre elles
+    surface_mesh.computeDihedralAngles();
+    //surface_mesh.displayDihedralAnglesInfos();
+    // Exportation des valeurs des angles dièdres en fonction de leur nombre d'occurrences au format CSV
+    surface_mesh.exportDihedralAnglesAsCSV("../dihedral_angles_decimated.csv");
+    // Calcul de l'aire des faces du maillage
+    surface_mesh.computeAreaOfFaces();
+    // Calcul de l'approximation de la courbure gaussienne à chaque sommet du maillage
+    surface_mesh.computeGaussianCurvature();
+    // Exportation du maillage avec un code couleur associé aux courbures gaussiennes de chaque sommet dans un fichier OBJ
+    surface_mesh.exportGaussianCurvatureAsOBJ("../gaussian_curvature.obj", false);
 
     return 0;
 }

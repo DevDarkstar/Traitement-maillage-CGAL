@@ -9,13 +9,13 @@
 #include <map>
 #include <iterator>
 #include <cmath>
-
-//#define CGAL_USE_BASIC_VIEWER
+#include <chrono>
 
 #include <CGAL/Simple_cartesian.h>
 #include <CGAL/Surface_mesh.h>
-#include <CGAL/boost/graph/IO/polygon_mesh_io.h>
-#include <CGAL/draw_surface_mesh.h>
+#include <CGAL/Surface_mesh_simplification/edge_collapse.h>
+#include <CGAL/Surface_mesh_simplification/Policies/Edge_collapse/Edge_count_ratio_stop_predicate.h>
+#include <CGAL/boost/graph/generators.h>
 
 //Simplification des noms des classes CGAL
 typedef CGAL::Simple_cartesian<double>          Kernel;
@@ -29,7 +29,7 @@ typedef Kernel::Vector_3                        Vector_3;
 
 class SurfaceMesh{
     public:
-    explicit SurfaceMesh(const std::string objFilePath); // Constructeur de la classe permettant de construire un objet de type Surface_mesh
+    explicit SurfaceMesh(const std::string objFilePath, float decimation_factor); // Constructeur de la classe permettant de construire un objet de type Surface_mesh
     void displaySurfaceMeshInfos(); // Affichage du nombre de sommets et de faces de l'attribut de la classe m_surface_mesh
     void computeVerticesValency(); // Calcul de la valence des sommets du maillage
     void displayValencyInfos(); // Affiche dans la console le nom des sommets du maillage avec la valence qui leur est associée
@@ -40,11 +40,18 @@ class SurfaceMesh{
     void computeAreaOfFaces(); // Calcul de l'aire des faces du maillage
     void displayFaceAreaInfos(); // Affiche la l'identifiant des faces du maillage et l'aire qui leur est associée
     void computeGaussianCurvature(); // Calcul de l'approximation de la courbure gaussienne à chaque sommet du maillage
-    void exportGaussianCurvatureAsOBJ(const std::string objFileName); // Exportation du maillage avec un code couleur associé aux courbures gaussiennes de chaque sommet dans un fichier OBJ
+    void exportGaussianCurvatureAsOBJ(const std::string objFileName, bool surface_mesh_indices); // Exportation du maillage avec un code couleur associé aux courbures gaussiennes de chaque sommet dans un fichier OBJ
+    void triangulated_surface_mesh_simplification(); // Application de l'algorithme de décimation sur la surface mesh contenue dans l'attribut m_surface_mesh
+    std::map<vertex_descriptor, int> getIndicesRemapping(); // Permet de rédéfinir les indices associés aux sommets de la surface mesh après l'algorithme de décimation
 
     private:
     // Objet CGAL construit par la classe
     Surface_mesh m_surface_mesh;
+    // Facteur de décimation utilisé dans l'algorithme de décimation du maillage
+    float m_decimation_factor;
+    // Valence maximum et minimum des sommets du maillage (utilisés pour le fichier CSV)
+    int m_min_valency;
+    int m_max_valency;
     // Propriétés associées au maillage créé
     std::map<face_descriptor, std::vector<vertex_descriptor>> m_face_vertices; // Associe à chaque face du maillage les sommets lui appartenant
     std::map<vertex_descriptor, int> m_vertex_valency; // Associe à chaque sommet du maillage la valence correspondante

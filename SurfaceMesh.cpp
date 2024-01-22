@@ -1,6 +1,8 @@
 #include "SurfaceMesh.hpp"
 
-SurfaceMesh::SurfaceMesh(const std::string objFilePath) {
+namespace SMS = CGAL::Surface_mesh_simplification;
+
+SurfaceMesh::SurfaceMesh(const std::string objFilePath, float decimation_factor) : m_decimation_factor(decimation_factor), m_min_valency(0), m_max_valency(0) {
     //Ouverture du fichier .obj
     std::ifstream objFile(objFilePath);
     if (!objFile) {
@@ -91,20 +93,22 @@ SurfaceMesh::SurfaceMesh(const std::string objFilePath) {
 void SurfaceMesh::displaySurfaceMeshInfos() {
     // Affichage du nombre de sommets et de faces du maillage
     // Première solution en utilisant les fonctions number_of_vertices et number_of_faces
-    std::cout << "Nombre de sommets de de faces en utilisant les fonctions number_of_vertices et number_of_faces :" << std::endl;
+    std::cout << "Nombre de sommets de de faces du maillage :" << std::endl;
     std::cout << "Nombres de sommets : " << m_surface_mesh.number_of_vertices() << std::endl;
     std::cout << "Nombres de faces : " << m_surface_mesh.number_of_faces() << std::endl;
     std::cout << std::endl;
 
     // Deuxième solution en récupérant la taille des tableaux contenant les sommets (fonction vertices() de Surface_mesh)
     // et les faces (fonction faces() de Surface_mesh)
-    std::cout << "Nombre de sommets de de faces en utilisant les tailles des tableaux de sommets et de faces :" << std::endl;
-    std::cout << "Nombres de sommets : " << m_surface_mesh.vertices().size() << std::endl;
-    std::cout << "Nombres de faces : " << m_surface_mesh.faces().size() << std::endl;
+    // std::cout << "Nombre de sommets de de faces en utilisant les tailles des tableaux de sommets et de faces :" << std::endl;
+    // std::cout << "Nombres de sommets : " << m_surface_mesh.vertices().size() << std::endl;
+    // std::cout << "Nombres de faces : " << m_surface_mesh.faces().size() << std::endl;
 }
 
 void SurfaceMesh::computeVerticesValency() {
-    // Calcul de la valence de chaque sommet du maillage. La valence pour un sommet donné correspond au nombre
+    // Calcul de la valence de chaque sommet du maillage. 
+    m_vertex_valency.clear();
+    //La valence pour un sommet donné correspond au nombre
     // de sommets qui sont directement voisins de ce sommet. Une autre façon de définir la valence d'un sommet va être de calculer le
     // nombre d'arêtes possédant ce sommet comme membre. C'est la stratégie utilisée ici.
     // Nous commençons par parcourir les arêtes du maillage
@@ -134,6 +138,27 @@ void SurfaceMesh::exportVerticesValencyAsCSV(const std::string csvFileName) {
     // de sorte à pouvoir afficher un histogramme représentant le nombre de sommets en fonction de leur valence
     // Création d'une map permettant de stocker ces nouvelles données (la clé représente la valence et la valeur le nombre de sommets ayant cette valence)
     std::map<int, int> valency_data;
+
+    // Si les valeurs minimum et maximum des valences des sommets n'ont pas encore été déterminées
+    if (!m_min_valency && !m_max_valency) {
+        //Nous commençons par rechercher la plus grande et la plus petite valeur de valence parmi toutes celles obtenues
+        int min_valency = 100;
+        int max_valency = 0;
+
+        for(vertex_descriptor v : m_surface_mesh.vertices()) {
+            min_valency = std::min(m_vertex_valency[v], min_valency);
+            max_valency = std::max(m_vertex_valency[v], max_valency);
+        }
+
+        // Affectation des min et max obtenus aux attributs de la classe
+        m_min_valency = min_valency;
+        m_max_valency = max_valency;
+    }
+    
+    //Initialisation des données de valency_data
+    for(int i = m_min_valency; i <= m_max_valency; i++) {
+        valency_data[i] = 0;
+    }
 
     // Nous parcourons la liste des sommets du maillage
     for (vertex_descriptor v : m_surface_mesh.vertices()) {
@@ -166,6 +191,7 @@ void SurfaceMesh::exportVerticesValencyAsCSV(const std::string csvFileName) {
 }
 
 void SurfaceMesh::computeDihedralAngles() {
+    m_dihedral_angles.clear();
     // Nous allons avoir besoin pour le calcul des angles dièdres entre faces adjacentes des coordonnées des sommets du maillage (contenue dans la structure de données
     // interne de la Surface Mesh de CGAL) ainsi que de la liste des sommets associés à une face (table de propriété m_face_vertices de la classe)
     // Récupération de la table de propriété des coordonnées des sommets du maillage
@@ -190,11 +216,11 @@ void SurfaceMesh::computeDihedralAngles() {
     }
 
     // Détermination des faces adjacentes à une face donnée qui seront stockées dans la table de propriété m_adjacent_faces
-
     // La stratégie ici est de parcourir l'ensemble des demi-arêtes d'une face et de définir les faces adjacentes en prenant les demi-arêtes opposées
     // à ces dernières (fonction de CGAL faces_aroud_face)
     // Parcours des faces du maillage 
     for (face_descriptor current_face : m_surface_mesh.faces()) {
+        m_adjacent_faces[current_face].clear();
         // Parcours des demi-arêtes de cette face
         for (face_descriptor face : faces_around_face(m_surface_mesh.halfedge(current_face), m_surface_mesh)) {
             if (face > current_face) {
@@ -367,6 +393,7 @@ void SurfaceMesh::exportDihedralAnglesAsCSV(const std::string csvFileName) {
 }
 
 void SurfaceMesh::computeAreaOfFaces() {
+    m_face_area.clear();
     // Nous allons avoir besoin pour le calcul des aires des faces des coordonnées des sommets du maillage (contenue dans la structure de données
     // interne de la Surface Mesh de CGAL) ainsi que de la liste des sommets associés à une face (table de propriété m_face_vertices de la classe)
     // Récupération de la table de propriété des coordonnées des sommets du maillage
@@ -423,6 +450,7 @@ void SurfaceMesh::displayFaceAreaInfos() {
 }
 
 void SurfaceMesh::computeGaussianCurvature() {
+    m_vertex_gaussian_curvature.clear();
     // La technique utilisée ici est une approche en approximant la courbure gaussienne de chaque sommet du maillage en utilisant 
     // les normales et les aires des faces
     // Comme nous allons utiliser l'aire des faces dans ce calcul et que le résultat de la courbure y est directement lié,
@@ -500,7 +528,7 @@ void SurfaceMesh::computeGaussianCurvature() {
     }*/
 }
 
-void SurfaceMesh::exportGaussianCurvatureAsOBJ(const std::string objFileName) {
+void SurfaceMesh::exportGaussianCurvatureAsOBJ(const std::string objFileName, bool surface_mesh_indices) {
     // Construction d'un fichier obj stockant à la fois les coordonnées des sommets et les couleurs de chacun d'entre eux
     // Sur Blender par exemple, les couleurs des sommets peuvent être voir en passant en mode "Vertex Paint"
     
@@ -568,21 +596,70 @@ void SurfaceMesh::exportGaussianCurvatureAsOBJ(const std::string objFileName) {
                 objOutputFile << 0 << " " << 0 << " " << 0 << "\n";
             }
         }
-
-        // Remplissage du fichier obj avec les indices des sommets des faces du maillage
-        for (face_descriptor f : m_surface_mesh.faces()) {
-            // Récupération des sommets composants cette face
-            std::vector<vertex_descriptor> vertices = m_face_vertices[f];
-            // Et écriture de leur indice dans le fichier
-            objOutputFile << "f ";
-            for (vertex_descriptor v : vertices) {
-                objOutputFile << v.idx() + 1 << " ";
+        // Si nous utilisons les indices des sommets contenus dans la surface mesh (cas avant l'algorithme de décimation)
+        if (surface_mesh_indices) {
+            // Remplissage du fichier obj avec les indices des sommets des faces du maillage
+            for (face_descriptor f : m_surface_mesh.faces()) {
+                // Récupération des sommets composants cette face
+                std::vector<vertex_descriptor> vertices = m_face_vertices[f];
+                // Et écriture de leur indice dans le fichier
+                objOutputFile << "f ";
+                for (vertex_descriptor v : vertices) {
+                    objOutputFile << v.idx() + 1 << " ";
+                }
+                objOutputFile << "\n";
             }
-            objOutputFile << "\n";
+        }
+        // Sinon nous utilisons un autre système d'indices des sommets (cas après l'algorithme de décimation)
+        else {
+            // Récupération des indices des sommets après l'algorithme de décimation
+            std::map<vertex_descriptor, int> vertex_indices = this->getIndicesRemapping();
+            for(face_descriptor f : m_surface_mesh.faces()) {
+                //Récupération des sommets composants cette face
+                std::vector<vertex_descriptor> vertices = m_face_vertices[f];
+                // Et écriture de leur indice dans le fichier en utilisant les nouvelles valeurs contenues dans vertex_indices
+                objOutputFile << "f ";
+                for(vertex_descriptor v : vertices) {
+                    objOutputFile << vertex_indices[v] << " ";
+                }
+                objOutputFile << "\n";
+            }
         }
 
         // Fermeture du fichier OBJ
         objOutputFile.close();
-        std::cout << "Création du fichier OBJ relatif aux courbures gaussiennes réussie" << std::endl;
+        std::cout << "Création du fichier OBJ relatif aux courbures gaussiennes réussie." << std::endl;
     }
+}
+
+void SurfaceMesh::triangulated_surface_mesh_simplification(){
+
+    if(!CGAL::is_triangle_mesh(m_surface_mesh))
+    {
+        throw std::runtime_error("Le maillage n'est pas composé que de faces triangulaires...");
+    }
+
+    std::chrono::steady_clock::time_point start_time = std::chrono::steady_clock::now();
+    // In this example, the simplification stops when the number of undirected edges
+    // drops below 10% of the initial count
+    SMS::Edge_count_ratio_stop_predicate<Surface_mesh> stop(m_decimation_factor);
+    int r = SMS::edge_collapse(m_surface_mesh, stop);
+    std::chrono::steady_clock::time_point end_time = std::chrono::steady_clock::now();
+    std::cout << "\nFinished!\n" << r << " edges removed.\n" << m_surface_mesh.number_of_edges() << " final edges.\n";
+    std::cout << m_surface_mesh.number_of_vertices() << " final vertices.\n";
+    std::cout << "Time elapsed: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() << "ms" << std::endl;
+    std::cout << std::endl;
+}
+
+std::map<vertex_descriptor, int> SurfaceMesh::getIndicesRemapping(){
+    std::map<vertex_descriptor, int> remapping;
+
+    // Pour ré-indexer le maillage, nous allons parcourir l'ensemble des sommets du maillage
+    // et associer pour chacun d'entre eux un indice qui ira de 1 au nombre de sommets restants du maillage
+    int new_index = 1;
+    for (vertex_descriptor v : m_surface_mesh.vertices()) {
+        remapping[v] = new_index++;
+    }
+
+    return remapping;
 }
