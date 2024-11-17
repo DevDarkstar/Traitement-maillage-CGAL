@@ -30,7 +30,7 @@ endif()
 
 
 include(${CGAL_USE_FILE})
-add_executable(main main.cpp SurfaceMesh.cpp)
+add_executable(main main.cpp SurfaceMesh.cpp tinyply.cpp)
 
 # include for local directory
 

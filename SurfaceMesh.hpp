@@ -2,14 +2,8 @@
 #define SURFACEMESH_HPP
 
 #include <string>
-#include <fstream>
-#include <iostream>
 #include <vector>
-#include <stdexcept>
 #include <map>
-#include <iterator>
-#include <cmath>
-#include <chrono>
 
 #include <CGAL/Simple_cartesian.h>
 #include <CGAL/Surface_mesh.h>
@@ -29,20 +23,22 @@ typedef Kernel::Vector_3                        Vector_3;
 
 class SurfaceMesh{
     public:
-    explicit SurfaceMesh(const std::string objFilePath, float decimation_factor); // Constructeur de la classe permettant de construire un objet de type Surface_mesh
+    explicit SurfaceMesh(const std::string& filepath, float decimation_factor); // Constructeur de la classe permettant de construire un objet de type Surface_mesh
     void displaySurfaceMeshInfos(); // Affichage du nombre de sommets et de faces de l'attribut de la classe m_surface_mesh
     void computeVerticesValency(); // Calcul de la valence des sommets du maillage
     void displayValencyInfos(); // Affiche dans la console le nom des sommets du maillage avec la valence qui leur est associée
-    void exportVerticesValencyAsCSV(const std::string csvFileName); // Exportation des valences des sommets du maillage au format CSV
+    void exportVerticesValencyAsCSV(const std::string csv_filename); // Exportation des valences des sommets du maillage au format CSV
     void computeDihedralAngles(); // Calcul des angles dièdres entre les faces adjacentes entre elles
     void displayDihedralAnglesInfos(); // Affiche dans la console le nom des faces du maillage et, pour chacune d'entre elles, la liste des faces d'indice plus elevé qui lui sont associées ainsi que la valeur de l'angle dièdre (en degré) entre ces deux faces
-    void exportDihedralAnglesAsCSV(const std::string csvFileName); // Exportation des valeurs des angles dièdres en fonction du nombre d'occurrences au format CSV
+    void exportDihedralAnglesAsCSV(const std::string csv_filename); // Exportation des valeurs des angles dièdres en fonction du nombre d'occurrences au format CSV
     void computeAreaOfFaces(); // Calcul de l'aire des faces du maillage
     void displayFaceAreaInfos(); // Affiche la l'identifiant des faces du maillage et l'aire qui leur est associée
     void computeGaussianCurvature(); // Calcul de l'approximation de la courbure gaussienne à chaque sommet du maillage
-    void exportGaussianCurvatureAsOBJ(const std::string objFileName, bool surface_mesh_indices); // Exportation du maillage avec un code couleur associé aux courbures gaussiennes de chaque sommet dans un fichier OBJ
+    void exportGaussianCurvatureAsOBJ(const std::string filename, bool surface_mesh_indices); // Exportation du maillage avec un code couleur associé aux courbures gaussiennes de chaque sommet dans un fichier OBJ
     void triangulated_surface_mesh_simplification(); // Application de l'algorithme de décimation sur la surface mesh contenue dans l'attribut m_surface_mesh
     std::map<vertex_descriptor, int> getIndicesRemapping(); // Permet de rédéfinir les indices associés aux sommets de la surface mesh après l'algorithme de décimation
+    void readPlyFile(const std::string& filepath, bool preload_into_memory); // Lecture d'un fichier au format .ply en utilisant tinyply
+    void readObjFile(const std::string& filepath); // Lecture d'un fichier au format .obj
 
     private:
     // Objet CGAL construit par la classe

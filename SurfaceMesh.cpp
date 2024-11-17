@@ -1,92 +1,30 @@
 #include "SurfaceMesh.hpp"
+#include <fstream>
+#include <iostream>
+#include <stdexcept>
+#include <iterator>
+#include <cmath>
+#include <chrono>
+#include "tinyply.h"
+#include "plyUtils.hpp"
 
+using namespace tinyply;
 namespace SMS = CGAL::Surface_mesh_simplification;
 
-SurfaceMesh::SurfaceMesh(const std::string objFilePath, float decimation_factor) : m_decimation_factor(decimation_factor), m_min_valency(0), m_max_valency(0) {
-    //Ouverture du fichier .obj
-    std::ifstream objFile(objFilePath);
-    if (!objFile) {
-        throw std::runtime_error("Le fichier .obj n'a pas pu être ouvert. Vérifiez le chemin vers votre fichier .obj.");
+SurfaceMesh::SurfaceMesh(const std::string& filepath, float decimation_factor) : m_decimation_factor(decimation_factor), m_min_valency(0), m_max_valency(0) {
+    //Récupération de l'extension du fichier à lire
+    std::string extension = filepath.substr(filepath.find_last_of('.') + 1);
+    //Si le fichier a pour extension .obj
+    if(extension == "obj"){
+        readObjFile(filepath);
     }
-
-    //création d'un tableau de vector_descriptor qui va contenir les informations des coordonnées des sommets du maillage
-    std::vector<vertex_descriptor> vertices_descriptor;
-    //création d'un tableau qui va contenir les indices des sommets par face
-    std::vector<std::vector<int>> face_indices;
-
-    // Lecture du fichier ligne par ligne
-    std::string line;
-    while (std::getline(objFile, line)) {
-        // création d'un buffer pour y stocker la ligne lue
-        std::istringstream buffer(line);
-        // création d'un variable pour y stocker le premier caractère de la ligne et nous renseigner quant aux données lues
-        // v = sommet et f = face. Les autres données seront ignorées
-        std::string id;
-
-        // Lecture du caractère et stockage dans la variable id
-        buffer >> id;
-
-        //S'il s'agit d'un sommet
-        if (id == "v") {
-            // Lire les coordonnées d'un sommet
-            // création de trois variables pour y stocker les coordonnées des sommets
-            float x, y, z;
-            // lecture des coordonnées du sommet
-            buffer >> x >> y >> z;
-            // ajout du sommet au maillage de notre Surface Mesh dont les coordonnées seront représentées par un objet de type Point_3
-            vertex_descriptor vertex = m_surface_mesh.add_vertex(Point_3(x, y, z));
-            // et ajout du sommet dans le tableau vertices_descriptor qui servira à construire les faces du maillage
-            vertices_descriptor.push_back(vertex);
-        }
-        // Sinon s'il s'agit d'une face
-        else if (id == "f") {
-            // Lire les indices d'une face
-            // création d'un tableau pour stocker les indices des sommets d'une face
-            std::vector<int> indices;
-            // Lecture des indices des sommets des faces
-            // Création d'une variable pour y stocker les données liées à un sommet. Il se peut que dans certains fichiers .obj, les données des sommets des faces soient 
-            // de cette forme : v/vt/vn (seule la première donnée nous intéresse ici)
-            std::string data;
-            // Tant qu'il reste des indices à lire
-            while (buffer >> data) {
-                // extraction de l'indice d'un sommet d'une face
-                int index = std::stoi(data.substr(0, data.find("/")));
-                // et ajout dans le tableau des indices d'une face
-                indices.push_back(index);
-            }
-            //stockage des indices de cette face dans le tableau face_indices
-            face_indices.push_back(indices);
-        }
+    //sinon si le fichier a pour extension .ply
+    else if(extension == "ply"){
+        readPlyFile(filepath, true);
     }
-
-    // Fermeture du fichier .obj
-    objFile.close();
-
-    // Création des faces du maillage par rapport aux indices des sommets récupérés
-    for (int i = 0; i < face_indices.size(); i++) {
-        // récupération du tableau d'indices
-        std::vector<int> indices = face_indices[i];
-        // récupération de la taille du tableau
-        std::size_t indices_size = indices.size();
-        //s'il s'agit d'une face triangulaire
-        if (indices_size == 3) {
-            // ajout de la face triangulaire aux données du maillage
-            // attention à toujours retirer 1 aux indices des sommets car ils commencent à 1 dans le fichier .obj mais à 0 dans vertices_descriptor
-            face_descriptor face = m_surface_mesh.add_face(vertices_descriptor[indices[0] - 1], vertices_descriptor[indices[1] - 1], vertices_descriptor[indices[2] - 1]);
-            // association de la liste des sommets de la face à la face du maillage correspondante
-            m_face_vertices[face] = {vertices_descriptor[indices[0] - 1], vertices_descriptor[indices[1] - 1], vertices_descriptor[indices[2] - 1]};
-        }
-        // Sinon s'il s'agit d'une face quadrangulaire
-        else if (indices_size == 4) {
-            // ajout de la face quadrangulaire aux données du maillage
-            face_descriptor face = m_surface_mesh.add_face(vertices_descriptor[indices[0] - 1], vertices_descriptor[indices[1] - 1], vertices_descriptor[indices[2] - 1], vertices_descriptor[indices[3] - 1]);
-            // association de la liste des sommets de la face à la face du maillage correspondante
-            m_face_vertices[face] = {vertices_descriptor[indices[0] - 1], vertices_descriptor[indices[1] - 1], vertices_descriptor[indices[2] - 1], vertices_descriptor[indices[3] - 1]};
-        }
-        // Sinon il s'agit d'un n-gon, c'est-à-dire une face formée de n > 4 sommets. Dans ce cas, nous ne pouvons pas créer le maillage
-        else {
-            throw std::runtime_error("Le maillage ne peut être composé que de faces triangulaires ou quadrangulaires.");
-        }
+    //sinon nous levons une exception
+    else{
+        throw std::runtime_error("Le fichier lu doit avoir pour extension .obj ou .ply...");
     }
 }
 
@@ -661,4 +599,173 @@ std::map<vertex_descriptor, int> SurfaceMesh::getIndicesRemapping(){
     }
 
     return remapping;
+}
+
+//Lecture d'un fichier PLY dont le nom est passé en paramètre
+void SurfaceMesh::readPlyFile(const std::string& filepath, bool preload_into_memory)
+{
+    std::unique_ptr<std::istream> file_stream;
+    std::vector<uint8_t> byte_buffer;
+
+    try
+    {
+        // For most files < 1gb, pre-loading the entire file upfront and wrapping it into a 
+        // stream is a net win for parsing speed, about 40% faster.
+        //Le preloading permet de stocker l'ensemble du fichier en RAM pour aller plus vite. A priori pour les fichiers < 1Go
+        if (preload_into_memory)
+        {
+            byte_buffer = read_file_binary(filepath);
+            file_stream.reset(new memory_stream((char*)byte_buffer.data(), byte_buffer.size()));
+        }
+        else
+        {
+            file_stream.reset(new std::ifstream(filepath, std::ios::binary));
+        }
+
+		//Si l'ouverture ne s'est pas réalisée
+        if (!file_stream || file_stream->fail()) throw std::runtime_error("file_stream failed to open " + filepath);
+
+        file_stream->seekg(0, std::ios::end);
+        const float size_mb = file_stream->tellg() * float(1e-6);
+        file_stream->seekg(0, std::ios::beg);
+
+        PlyFile file;
+        file.parse_header(*file_stream);
+
+        // Because most people have their own mesh types, tinyply treats parsed data as structured/typed byte buffers. 
+        // See examples below on how to marry your own application-specific data structures with this one. 
+        std::shared_ptr<PlyData> vertices, normals, colors, texcoords, faces, tripstrip;
+        
+        //Parmi toutes les données lues, nous ne conserverons que les coordonnées des sommets et les indices des sommets des faces
+        //Préparation des structures de sommets {x,y,z}
+        try { vertices = file.request_properties_from_element("vertex", { "x", "y", "z" }); }
+        catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
+
+		//Pour les faces (indices de sommets)
+        try { faces = file.request_properties_from_element("face", { "vertex_indices" }, 3); }
+        catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
+        
+		//Lecture du fichier
+		file.read(*file_stream);
+
+        //Affichage du nombre d'éléments
+        if (vertices)   std::cout << "\tRead " << vertices->count  << " total vertices "<< std::endl;
+        //if (normals)    std::cout << "\tRead " << normals->count   << " total vertex normals " << std::endl;
+        if (colors)     std::cout << "\tRead " << colors->count << " total vertex colors " << std::endl;
+        //if (texcoords)  std::cout << "\tRead " << texcoords->count << " total vertex texcoords " << std::endl;
+        if (faces)      std::cout << "\tRead " << faces->count     << " total faces (triangles) " << std::endl;
+        //if (tripstrip)  std::cout << "\tRead " << (tripstrip->buffer.size_bytes() / tinyply::PropertyTable[tripstrip->t].stride) << " total indicies (tristrip) " << std::endl;
+
+        //Lecture des coordonnées dees sommets du maillage
+        const size_t numVerticesBytes = vertices->buffer.size_bytes();
+        std::vector<float3> verts(vertices->count);
+        std::memcpy(verts.data(), vertices->buffer.get(), numVerticesBytes);
+
+        //création d'un tableau de vertex_descriptor qui va contenir les informations des coordonnées des sommets du maillage
+        std::vector<vertex_descriptor> vertices_descriptor;
+        //création d'un tableau qui va contenir les indices des sommets par face
+        std::vector<std::array<int,3>> face_indices;
+        //Création des sommets du maillage 
+        for (const auto& vertex: verts)
+        {
+            // ajout du sommet au maillage de notre Surface Mesh dont les coordonnées seront représentées par un objet de type Point_3
+            // et stockage du vertex_descriptor retourné dans le conteneur servant à construire ultérieurement les faces du maillage
+            vertices_descriptor.push_back(m_surface_mesh.add_vertex(Point_3(vertex.x, vertex.y, vertex.z)));
+        }
+        
+        
+        //Lecture des indices des sommets par face
+        const size_t numFacesBytes = faces->buffer.size_bytes();
+        std::vector<uint3> lfaces(faces->count);
+        std::memcpy(lfaces.data(), faces->buffer.get(), numFacesBytes);
+         
+        // Création des faces du maillage par rapport aux indices des sommets récupérés
+        for (const auto& lface: lfaces)
+        {
+            // ajout de la face triangulaire aux données du maillage
+            face_descriptor face = m_surface_mesh.add_face(vertices_descriptor[lface.x], vertices_descriptor[lface.y], vertices_descriptor[lface.z]);
+            // association de la liste des sommets de la face à la face du maillage correspondante
+            m_face_vertices[face] = {vertices_descriptor[lface.x], vertices_descriptor[lface.y], vertices_descriptor[lface.z]};
+        }
+    }
+    catch (const std::exception & e)
+    {
+        std::cerr << "Caught tinyply exception: " << e.what() << std::endl;
+    }
+}
+
+void SurfaceMesh::readObjFile(const std::string& filepath)
+{
+    //Ouverture du fichier .obj
+    std::ifstream objFile(filepath);
+    if (!objFile) {
+        throw std::runtime_error("Le fichier .obj n'a pas pu être ouvert. Vérifiez le chemin vers votre fichier .obj.");
+    }
+
+    //création d'un tableau de vertex_descriptor qui va contenir les informations des coordonnées des sommets du maillage
+    std::vector<vertex_descriptor> vertices_descriptor;
+    //création d'un tableau qui va contenir les indices des sommets par face
+    std::vector<std::array<int,3>> face_indices;
+
+    // Lecture du fichier ligne par ligne
+    std::string line;
+    while (std::getline(objFile, line)) {
+        // création d'un buffer pour y stocker la ligne lue
+        std::istringstream buffer(line);
+        // création d'un variable pour y stocker le premier caractère de la ligne et nous renseigner quant aux données lues
+        // v = sommet et f = face. Les autres données seront ignorées
+        std::string id;
+
+        // Lecture du caractère et stockage dans la variable id
+        buffer >> id;
+
+        //S'il s'agit d'un sommet
+        if (id == "v") {
+            // Lire les coordonnées d'un sommet
+            // création de trois variables pour y stocker les coordonnées des sommets
+            float x, y, z;
+            // lecture des coordonnées du sommet
+            buffer >> x >> y >> z;
+            // ajout du sommet au maillage de notre Surface Mesh dont les coordonnées seront représentées par un objet de type Point_3
+            // et stockage du vertex_descriptor retourné dans le conteneur servant à construire ultérieurement les faces du maillage
+            vertices_descriptor.push_back(m_surface_mesh.add_vertex(Point_3(x, y, z)));
+        }
+        // Sinon s'il s'agit d'une face
+        else if (id == "f") {
+            // Lire les indices d'une face
+            // création d'un tableau pour stocker les indices des sommets d'une face
+            std::array<int,3> indices;
+            // Lecture des indices des sommets des faces
+            // Création d'une variable pour y stocker les données liées à un sommet. Il se peut que dans certains fichiers .obj, les données des sommets des faces soient 
+            // de cette forme : v/vt/vn (seule la première donnée nous intéresse ici)
+            std::string data;
+            // Tant qu'il reste des indices à lire
+            int i = 0;
+            while (buffer >> data) {
+                // lecture de l'indice et ajout de ce dernier dans le tableau des indices de la face courante en enlevant 1 à sa valeur car
+                // les indices des sommets commencent à 1 dans le fichier obj
+                try{
+                    indices[i] = std::stoi(data.substr(0, data.find("/"))) - 1;
+                }catch(const std::exception& e){
+                    std::cout << "Erreur lors de la lecture des indices des faces : " << e.what() << std::endl;
+                }
+                i++;
+            }
+            //stockage des indices de cette face dans le tableau face_indices
+            face_indices.push_back(indices);
+        }
+    }
+
+    // Fermeture du fichier .obj
+    objFile.close();
+
+    // Création des faces du maillage par rapport aux indices des sommets récupérés
+    for (int i = 0; i < face_indices.size(); i++) {
+        // récupération du tableau d'indices
+        const std::array<int,3>& indices = face_indices[i];
+        // ajout de la face triangulaire aux données du maillage
+        face_descriptor face = m_surface_mesh.add_face(vertices_descriptor[indices[0]], vertices_descriptor[indices[1]], vertices_descriptor[indices[2]]);
+        // association de la liste des sommets de la face à la face du maillage correspondante
+        m_face_vertices[face] = {vertices_descriptor[indices[0]], vertices_descriptor[indices[1]], vertices_descriptor[indices[2]]};
+    }
 }
