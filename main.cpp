@@ -24,17 +24,17 @@ int main(int argc, char* argv[]){
     // Affichage du nombre de sommets et de faces du maillage
     surface_mesh.displaySurfaceMeshInfos();
     // Calcul de la valence de chaque sommet du maillage
-    std::tuple<std::map<vertex_descriptor, int>, int> vertex_valency_mesh = surface_mesh.computeVerticesValency();
+    std::tuple<std::map<vertex_descriptor, int>, int> mesh_vertex_valency = surface_mesh.computeVerticesValency();
     //surface_mesh.displayValencyInfos(std::get<0>(vertex_valency_mesh));
     // Exportation des valences des sommets au format CSV
-    surface_mesh.exportVerticesValencyAsCSV(vertex_valency_mesh, "../valency.csv");
+    surface_mesh.exportVerticesValencyAsCSV(mesh_vertex_valency, "../valency.csv");
     // Calcul des angles dièdres des faces adjacentes entre elles
-    surface_mesh.computeDihedralAngles();
-    //surface_mesh.displayDihedralAnglesInfos();
+    std::tuple<std::map<face_descriptor, std::vector<double>>, std::map<face_descriptor, Vector_3>> mesh_dihedral_angles = surface_mesh.computeDihedralAngles();
+    surface_mesh.displayDihedralAnglesInfos(std::get<0>(mesh_dihedral_angles));
     // Exportation des valeurs des angles dièdres en fonction de leur nombre d'occurrences au format CSV
-    surface_mesh.exportDihedralAnglesAsCSV("../dihedral_angles.csv");
+    surface_mesh.exportDihedralAnglesAsCSV(std::get<0>(mesh_dihedral_angles), "../dihedral_angles.csv");
     // Calcul de l'aire des faces du maillage
-    surface_mesh.computeAreaOfFaces();
+    /*surface_mesh.computeAreaOfFaces();
     // Calcul de l'approximation de la courbure gaussienne à chaque sommet du maillage
     surface_mesh.computeGaussianCurvature();
     // Exportation du maillage avec un code couleur associé aux courbures gaussiennes de chaque sommet dans un fichier OBJ
@@ -61,7 +61,7 @@ int main(int argc, char* argv[]){
     // Calcul de l'approximation de la courbure gaussienne à chaque sommet du maillage
     surface_mesh.computeGaussianCurvature();
     // Exportation du maillage avec un code couleur associé aux courbures gaussiennes de chaque sommet dans un fichier OBJ
-    surface_mesh.exportGaussianCurvatureAsOBJ("../gaussian_curvature_decimated.obj", false);
+    surface_mesh.exportGaussianCurvatureAsOBJ("../gaussian_curvature_decimated.obj", false);*/
 
     return 0;
 }

@@ -28,7 +28,7 @@ SurfaceMesh::SurfaceMesh(const std::string& filepath, float decimation_factor) :
     }
 }
 
-void SurfaceMesh::displaySurfaceMeshInfos() {
+void SurfaceMesh::displaySurfaceMeshInfos() const {
     // Affichage du nombre de sommets et de faces du maillage
     // Première solution en utilisant les fonctions number_of_vertices et number_of_faces
     std::cout << "Nombre de sommets de de faces du maillage :" << std::endl;
@@ -48,13 +48,13 @@ std::tuple<std::map<vertex_descriptor, int>, int> SurfaceMesh::computeVerticesVa
     //m_vertex_valency.clear();
     // Création d'une table associant à un sommet du maillage sa valence
     std::map<vertex_descriptor, int> vertex_valency;
-    //Initialisation de la map
+    // Initialisation de la map
     for(const auto& vertex : this->m_surface_mesh.vertices()){
         vertex_valency[vertex] = 0;
     }
     // Ainsi qu'une variable contenant la valence maximale dans le maillage (utilisées pour la création du fichier CSV)
     int max_valency = -10000;
-    //La valence pour un sommet donné correspond au nombre
+    // La valence pour un sommet donné correspond au nombre
     // de sommets qui sont directement voisins de ce sommet. Une autre façon de définir la valence d'un sommet va être de calculer le
     // nombre d'arêtes possédant ce sommet comme membre. C'est la stratégie utilisée ici.
     // Nous commençons par parcourir les arêtes du maillage
@@ -66,18 +66,15 @@ std::tuple<std::map<vertex_descriptor, int>, int> SurfaceMesh::computeVerticesVa
         vertex_descriptor v2 = m_surface_mesh.target(he);
 
         // Incrémentation de la valence de ces deux sommets dans la propriété du maillage sur les valences et mise à jour de la valeur de valence maximale
-        int v1_valency = ++vertex_valency[v1];
-        max_valency = std::max(max_valency, v1_valency);
-
-        int v2_valency = ++vertex_valency[v2];
-        max_valency = std::max(max_valency, v2_valency);
+        max_valency = std::max(max_valency, vertex_valency[v1]++);
+        max_valency = std::max(max_valency, vertex_valency[v2]++);
     }
 
     return std::make_tuple(vertex_valency, max_valency);
 }
 
-void SurfaceMesh::displayValencyInfos(const std::map<vertex_descriptor, int>& vertex_valency) {
-    //Affichage des valences des sommets du maillage
+void SurfaceMesh::displayValencyInfos(const std::map<vertex_descriptor, int>& vertex_valency) const {
+    // Affichage des valences des sommets du maillage
     for (const auto& p : vertex_valency) {
         std::cout << "Valence de " << p.first << " : " << p.second << std::endl;
     }
@@ -92,9 +89,8 @@ void SurfaceMesh::exportVerticesValencyAsCSV(const std::tuple<std::map<vertex_de
 
     std::tie(vertex_valency, max_valency) = data;
 
-    // Création d'un tableau contenant pour chaque indice i, le nombre de sommets ayant une valence de i + min_valency
+    // Création d'un tableau contenant pour chaque indice i, le nombre de sommets ayant une valence égale à i
     std::vector<int> valency_data (max_valency + 1, 0);
-    std::cout << valency_data.size() << std::endl;
 
     // Nous parcourons la table associant un sommet du maillage à sa valence
     for (const auto& p : vertex_valency) {
@@ -125,19 +121,24 @@ void SurfaceMesh::exportVerticesValencyAsCSV(const std::tuple<std::map<vertex_de
     }
 }
 
-void SurfaceMesh::computeDihedralAngles() {
-    m_dihedral_angles.clear();
+std::tuple<std::map<face_descriptor, std::vector<double>>, std::map<face_descriptor, Vector_3>> SurfaceMesh::computeDihedralAngles() {
     // Nous allons avoir besoin pour le calcul des angles dièdres entre faces adjacentes des coordonnées des sommets du maillage (contenue dans la structure de données
     // interne de la Surface Mesh de CGAL) ainsi que de la liste des sommets associés à une face (table de propriété m_face_vertices de la classe)
     // Récupération de la table de propriété des coordonnées des sommets du maillage
     Surface_mesh::Property_map<vertex_descriptor, Point_3> vertices_coordinates = m_surface_mesh.property_map<vertex_descriptor, Point_3>("v:point").first;
 
-    // Les valeurs des angles dièdres (calculés ici en degré), seront stockées dans la propriété m_dihedral_angles de la classe
+    // Les valeurs des angles dièdres (calculés ici en degré), seront stockées dans la table suivante où à chaque face seront associées les valeurs des angles diédres obtenus
+    // entre la face courante et les faces adjacentes.
+    // Afin d'éviter les doublons, la stratégie va être d'associer à chaque face les valeurs des angles dièdres entre cette face et ses faces adjacentes avec un indice
+    // strictement supérieur
+    std::map<face_descriptor, std::vector<double>> dihedral_angles;
+    // Nous créons également une autre table associant à une face donnée sa normale stockée sous la forme d'un Vector_3
+    std::map<face_descriptor, Vector_3> face_normal;
 
-    // Remplissage de la propriété m_face_normal de la classe associant à chaque face du maillage le vecteur normal (de type Vector_3) correspondant
-    for (face_descriptor face : m_surface_mesh.faces()) {
+    // Remplissage de la table des normales aux faces en associant à chaque face du maillage le vecteur normal (de type Vector_3) correspondant
+    for (const auto& face : this->m_surface_mesh.faces()) {
         // Récupération de la liste des sommets associés à cette face
-        std::vector<vertex_descriptor> vertices = m_face_vertices[face];
+        const std::vector<vertex_descriptor>& vertices = this->m_face_vertices[face];
 
         // Calcul de deux vecteurs de cette face
         Vector_3 v1 = vertices_coordinates[vertices[1]] - vertices_coordinates[vertices[0]];
@@ -147,62 +148,53 @@ void SurfaceMesh::computeDihedralAngles() {
         Vector_3 normal = CGAL::cross_product(v1, v2);
 
         // Stockage de la normale à cette face dans la table de propriété associée
-        m_face_normal[face] = normal;
+        face_normal[face] = normal;
     }
 
-    // Détermination des faces adjacentes à une face donnée qui seront stockées dans la table de propriété m_adjacent_faces
-    m_adjacent_faces.clear();
-    // La stratégie ici est de parcourir l'ensemble des demi-arêtes d'une face et de définir les faces adjacentes en prenant les demi-arêtes opposées
-    // à ces dernières (fonction de CGAL faces_aroud_face)
-    // Parcours des faces du maillage 
-    for (face_descriptor current_face : m_surface_mesh.faces()) {
-        // Parcours des demi-arêtes de cette face
-        for (face_descriptor face : faces_around_face(m_surface_mesh.halfedge(current_face), m_surface_mesh)) {
-            if (face > current_face) {
-                m_adjacent_faces[current_face].push_back(face);
+    // Calcul des angles dièdres entre faces adjacentes
+    // A chaque face, sera associé la liste des angles dièdres des faces, ayant un indice strictement plus élevé à cette dernière, qui lui sont adjacentes
+
+    // Remplissage de la table de propriété
+    // Parcours des faces du maillage
+    for(const auto& face : this->m_surface_mesh.faces()) {
+        // Récupération du vecteur normal à la face courante
+        Vector_3 normal = face_normal[face];
+        // Calcul de la norme de ce vecteur
+        double norm = CGAL::sqrt(normal.squared_length());
+
+        // Puis, parcours des faces adjacentes à la face courante en utilisant ses demi-arêtes
+        for(const auto& adjacent_face : faces_around_face(this->m_surface_mesh.halfedge(face), this->m_surface_mesh))
+        {
+            // Si la face adjacente a un indice strictement supérieur à la face courante
+            if(adjacent_face.idx() > face.idx())
+            {
+                // Récupération de la normale de la face adjacente
+                Vector_3 adjacent_normal = face_normal[adjacent_face];
+                // Calcul de la norme de ce vecteur
+                double adjacent_norm = CGAL::sqrt(adjacent_normal.squared_length());
+                // Calcul de l'angle dièdre entre cette face et la face courante en degrés (compris entre 0 et 180°)
+                double dihedral_angle = std::acos((normal * adjacent_normal) / (norm * adjacent_norm)) * 180 / CGAL_PI;
+                // Ajout de l'angle dièdre à la table de propriété
+                dihedral_angles[face].push_back(dihedral_angle);
             }
         }
     }
 
-    // Calcul des angles dièdres entre faces adjacentes (le résultat sera stocké dans la table de propriété m_dihedral_angles de la classe)
-    // A chaque face, sera associé la liste des angles dièdres des faces (avec un indice plus élevé) qui lui sont adjacentes
-
-    // Remplissage de la table de propriété
-    for(face_descriptor face : m_surface_mesh.faces()) {
-        // Récupération de la normale de la face courante
-        Vector_3 current_normal = m_face_normal[face];
-        // Calcul de la norme de ce vecteur
-        double current_norm = CGAL::sqrt(current_normal.squared_length());
-        // Récupération des faces adjacentes à celle-ci
-        std::vector<face_descriptor> faces = m_adjacent_faces[face];
-
-        for(face_descriptor adjacent_face : faces) {
-            // Récupération de la normale de cette face
-            Vector_3 normal = m_face_normal[adjacent_face];
-            // Calcul de la norme de ce vecteur
-            double norm = CGAL::sqrt(normal.squared_length());
-            // Calcul de l'angle dièdre entre cette face et la face courante en degrés (compris entre 0 et 180°)
-            double dihedral_angle = std::acos((current_normal * normal) / (current_norm * norm)) * 180 / CGAL_PI;
-            // Ajout de l'angle dièdre à la table de propriété
-            m_dihedral_angles[face].push_back(dihedral_angle);
-        } 
-    }
+    return std::make_tuple(dihedral_angles, face_normal);
 }
 
-void SurfaceMesh::displayDihedralAnglesInfos() {
+void SurfaceMesh::displayDihedralAnglesInfos(const std::map<face_descriptor, std::vector<double>>& dihedral_angles) const {
     // Affichage des angles dièdres des faces adjacentes
-    for (face_descriptor face : m_surface_mesh.faces()) {
-        std::cout << "Faces adjacentes à " << face << " : ";
-        std::vector<face_descriptor>::iterator adjacent_face = m_adjacent_faces[face].begin();
-        std::vector<double>::iterator dihedral_angle = m_dihedral_angles[face].begin();
-        for (; adjacent_face != m_adjacent_faces[face].end() && dihedral_angle != m_dihedral_angles[face].end(); ++adjacent_face, ++dihedral_angle) {
-            std::cout << *adjacent_face << " d'angle dièdre : " << *dihedral_angle << "°, ";
+    for(const auto& p : dihedral_angles){
+        std::cout << "Valeur des angles dièdres des faces adjacentes à " << p.first << " ";
+        for(const auto& angle : p.second){
+            std::cout << angle << "°, ";
         }
         std::cout << std::endl;
     }
 }
 
-void SurfaceMesh::exportDihedralAnglesAsCSV(const std::string csvFileName) {
+void SurfaceMesh::exportDihedralAnglesAsCSV(std::map<face_descriptor, std::vector<double>>& dihedral_angles, const std::string csvFileName) {
     // Nous allons nous servir pour créer le fichier CSV de la table de propriété de la classe m_dihedral_angles contenant l'ensemble des angles dièdres entre faces adjacentes
 
     // Comme l'objectif est de pouvoir exporter les données de sorte à pouvoir réaliser un histogramme, nous allons préparer ces dernières
@@ -220,86 +212,15 @@ void SurfaceMesh::exportDihedralAnglesAsCSV(const std::string csvFileName) {
     }
 
     // Nous parcourons la liste des faces du maillage
-    for (face_descriptor face : m_surface_mesh.faces()) {
+    for (const auto& face : this->m_surface_mesh.faces()) {
         // récupération de la liste des angles dièdres associés à cette face
-        std::vector<double> angles = m_dihedral_angles[face];
+        std::vector<double> angles = dihedral_angles[face];
         // Parcours de la liste de ces angles
-        for(double angle : angles) {
+        for(int i = 0; i < angles.size(); i++) {
             // arrondissement de la valeur de l'angle dièdre à l'entier le plus proche
-            int rounded_angle = (int)std::round(angle);
+            int rounded_angle = static_cast<int>(std::round(angles[i]));
             // incrémentation du nombre d'occurrences avec cette valeur d'angle dans l'intervalle correspondant
-            if(rounded_angle < 5)
-                dihedral_angles_data[0]++;
-            else if (rounded_angle < 10)
-                dihedral_angles_data[1]++;
-            else if (rounded_angle < 15)
-                dihedral_angles_data[2]++;
-            else if (rounded_angle < 20)
-                dihedral_angles_data[3]++;
-            else if (rounded_angle < 25)
-                dihedral_angles_data[4]++;
-            else if (rounded_angle < 30)
-                dihedral_angles_data[5]++;
-            else if (rounded_angle < 35)
-                dihedral_angles_data[6]++;
-            else if (rounded_angle < 40)
-                dihedral_angles_data[7]++;
-            else if (rounded_angle < 45)
-                dihedral_angles_data[8]++;
-            else if (rounded_angle < 50)
-                dihedral_angles_data[9]++;
-            else if (rounded_angle < 55)
-                dihedral_angles_data[10]++;
-            else if (rounded_angle < 60)
-                dihedral_angles_data[11]++;
-            else if (rounded_angle < 65)
-                dihedral_angles_data[12]++;
-            else if (rounded_angle < 70)
-                dihedral_angles_data[13]++;
-            else if (rounded_angle < 75)
-                dihedral_angles_data[14]++;
-            else if (rounded_angle < 80)
-                dihedral_angles_data[15]++;
-            else if (rounded_angle < 85)
-                dihedral_angles_data[16]++;
-            else if (rounded_angle < 90)
-                dihedral_angles_data[17]++;
-            else if (rounded_angle < 95)
-                dihedral_angles_data[18]++;
-            else if (rounded_angle < 100)
-                dihedral_angles_data[19]++;
-            else if (rounded_angle < 105)
-                dihedral_angles_data[20]++;
-            else if (rounded_angle < 110)
-                dihedral_angles_data[21]++;
-            else if (rounded_angle < 115)
-                dihedral_angles_data[22]++;
-            else if (rounded_angle < 120)
-                dihedral_angles_data[23]++;
-            else if (rounded_angle < 125)
-                dihedral_angles_data[24]++;
-            else if (rounded_angle < 130)
-                dihedral_angles_data[25]++;
-            else if (rounded_angle < 135)
-                dihedral_angles_data[26]++;
-            else if (rounded_angle < 140)
-                dihedral_angles_data[27]++;
-            else if (rounded_angle < 145)
-                dihedral_angles_data[28]++;
-            else if (rounded_angle < 150)
-                dihedral_angles_data[29]++;
-            else if (rounded_angle < 155)
-                dihedral_angles_data[30]++;
-            else if (rounded_angle < 160)
-                dihedral_angles_data[31]++;
-            else if (rounded_angle < 165)
-                dihedral_angles_data[32]++;
-            else if (rounded_angle < 170)
-                dihedral_angles_data[33]++;
-            else if (rounded_angle < 175)
-                dihedral_angles_data[34]++;
-            else
-                dihedral_angles_data[35]++;
+            dihedral_angles_data[rounded_angle / 5]++;
         }     
     }
 

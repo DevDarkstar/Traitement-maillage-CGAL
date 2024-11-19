@@ -25,13 +25,13 @@ typedef Kernel::Vector_3                        Vector_3;
 class SurfaceMesh{
     public:
     SurfaceMesh(const std::string& filepath, float decimation_factor); // Constructeur de la classe permettant de construire un objet de type Surface_mesh
-    void displaySurfaceMeshInfos(); // Affichage du nombre de sommets et de faces de l'attribut de la classe Surface_mesh
+    void displaySurfaceMeshInfos() const; // Affichage du nombre de sommets et de faces de l'attribut de la classe Surface_mesh
     std::tuple<std::map<vertex_descriptor, int>, int> computeVerticesValency(); // Calcul de la valence des sommets du maillage (retourne un tuple contenant la table associant à chaque sommet sa valence correspondante, ainsi que la valeur de valence maximum)
-    void displayValencyInfos(const std::map<vertex_descriptor, int>& vertex_valency); // Affiche dans la console le nom des sommets du maillage avec la valence qui leur est associée (pour débuggage)
+    void displayValencyInfos(const std::map<vertex_descriptor, int>& vertex_valency) const; // Affiche dans la console le nom des sommets du maillage avec la valence qui leur est associée (pour débuggage)
     void exportVerticesValencyAsCSV(const std::tuple<std::map<vertex_descriptor, int>, int>& data, const std::string csv_filename); // Exportation des valences des sommets du maillage au format CSV
-    void computeDihedralAngles(); // Calcul des angles dièdres entre les faces adjacentes entre elles
-    void displayDihedralAnglesInfos(); // Affiche dans la console le nom des faces du maillage et, pour chacune d'entre elles, la liste des faces d'indice plus elevé qui lui sont associées ainsi que la valeur de l'angle dièdre (en degré) entre ces deux faces
-    void exportDihedralAnglesAsCSV(const std::string csv_filename); // Exportation des valeurs des angles dièdres en fonction du nombre d'occurrences au format CSV
+    std::tuple<std::map<face_descriptor, std::vector<double>>, std::map<face_descriptor, Vector_3>> computeDihedralAngles(); // Calcul des angles dièdres entre les faces adjacentes entre elles
+    void displayDihedralAnglesInfos(const std::map<face_descriptor, std::vector<double>>& dihedral_angles) const; // Affiche dans la console le nom des faces du maillage et, pour chacune d'entre elles, la liste des faces d'indice plus elevé qui lui sont associées ainsi que la valeur de l'angle dièdre (en degré) entre ces deux faces
+    void exportDihedralAnglesAsCSV(std::map<face_descriptor, std::vector<double>>& dihedral_angles, const std::string csv_filename); // Exportation des valeurs des angles dièdres en fonction du nombre d'occurrences au format CSV
     void computeAreaOfFaces(); // Calcul de l'aire des faces du maillage
     void displayFaceAreaInfos(); // Affiche la l'identifiant des faces du maillage et l'aire qui leur est associée
     void computeGaussianCurvature(); // Calcul de l'approximation de la courbure gaussienne à chaque sommet du maillage
@@ -53,8 +53,8 @@ class SurfaceMesh{
     std::map<face_descriptor, std::vector<vertex_descriptor>> m_face_vertices; // Associe à chaque face du maillage les sommets lui appartenant
     //std::map<vertex_descriptor, int> m_vertex_valency; // Associe à chaque sommet du maillage la valence correspondante
     std::map<face_descriptor, Vector_3> m_face_normal; // Associe à chaque face du maillage sa normale correspondante
-    std::map<face_descriptor, std::vector<face_descriptor>> m_adjacent_faces; // Associe à chaque face du maillage la liste des faces (avec un indice plus élevé) qui lui sont adjacentes
-    std::map<face_descriptor, std::vector<double>> m_dihedral_angles; // Associe à chaque face du maillage la liste des angles dièdres entre la face courante et les faces qui lui sont adjacentes
+    //std::map<face_descriptor, std::vector<face_descriptor>> m_adjacent_faces; // Associe à chaque face du maillage la liste des faces (avec un indice plus élevé) qui lui sont adjacentes
+    //std::map<face_descriptor, std::vector<double>> m_dihedral_angles; // Associe à chaque face du maillage la liste des angles dièdres entre la face courante et les faces qui lui sont adjacentes
     std::map<face_descriptor, double> m_face_area; // Associe à chaque face du maillage son aire correspondante
     std::map<vertex_descriptor, double> m_vertex_gaussian_curvature; // Associe à chaque sommet du maillage une approximation de sa courbure gaussienne
 };
