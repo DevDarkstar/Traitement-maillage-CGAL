@@ -24,10 +24,10 @@ int main(int argc, char* argv[]){
     // Affichage du nombre de sommets et de faces du maillage
     surface_mesh.displaySurfaceMeshInfos();
     // Calcul de la valence de chaque sommet du maillage
-    surface_mesh.computeVerticesValency();
-    //surface_mesh.displayValencyInfos();
+    std::tuple<std::map<vertex_descriptor, int>, int> vertex_valency_mesh = surface_mesh.computeVerticesValency();
+    //surface_mesh.displayValencyInfos(std::get<0>(vertex_valency_mesh));
     // Exportation des valences des sommets au format CSV
-    surface_mesh.exportVerticesValencyAsCSV("../valency.csv");
+    surface_mesh.exportVerticesValencyAsCSV(vertex_valency_mesh, "../valency.csv");
     // Calcul des angles dièdres des faces adjacentes entre elles
     surface_mesh.computeDihedralAngles();
     //surface_mesh.displayDihedralAnglesInfos();
@@ -47,10 +47,10 @@ int main(int argc, char* argv[]){
     // Affichage du nombre de sommets et de faces du maillage
     surface_mesh.displaySurfaceMeshInfos();
     // Calcul de la valence de chaque sommet du maillage
-    surface_mesh.computeVerticesValency();
-    //surface_mesh.displayValencyInfos();
+    std::tuple<std::map<vertex_descriptor, int>, int> vertex_valency_decimated_mesh = surface_mesh.computeVerticesValency();
+    //surface_mesh.displayValencyInfos(std::get<0>(vertex_valency_decimated_mesh));
     // Exportation des valences des sommets au format CSV
-    surface_mesh.exportVerticesValencyAsCSV("../valency_decimated.csv");
+    surface_mesh.exportVerticesValencyAsCSV(vertex_valency_decimated_mesh, "../valency_decimated.csv");
     // Calcul des angles dièdres des faces adjacentes entre elles
     surface_mesh.computeDihedralAngles();
     //surface_mesh.displayDihedralAnglesInfos();

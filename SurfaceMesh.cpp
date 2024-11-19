@@ -11,16 +11,16 @@
 using namespace tinyply;
 namespace SMS = CGAL::Surface_mesh_simplification;
 
-SurfaceMesh::SurfaceMesh(const std::string& filepath, float decimation_factor) : m_decimation_factor(decimation_factor), m_min_valency(0), m_max_valency(0) {
+SurfaceMesh::SurfaceMesh(const std::string& filepath, float decimation_factor) : m_decimation_factor(decimation_factor) {
     //Récupération de l'extension du fichier à lire
     std::string extension = filepath.substr(filepath.find_last_of('.') + 1);
     //Si le fichier a pour extension .obj
     if(extension == "obj"){
-        readObjFile(filepath);
+        this->readObjFile(filepath);
     }
     //sinon si le fichier a pour extension .ply
     else if(extension == "ply"){
-        readPlyFile(filepath, true);
+        this->readPlyFile(filepath, true);
     }
     //sinon nous levons une exception
     else{
@@ -32,8 +32,8 @@ void SurfaceMesh::displaySurfaceMeshInfos() {
     // Affichage du nombre de sommets et de faces du maillage
     // Première solution en utilisant les fonctions number_of_vertices et number_of_faces
     std::cout << "Nombre de sommets de de faces du maillage :" << std::endl;
-    std::cout << "Nombres de sommets : " << m_surface_mesh.number_of_vertices() << std::endl;
-    std::cout << "Nombres de faces : " << m_surface_mesh.number_of_faces() << std::endl;
+    std::cout << "Nombres de sommets : " << this->m_surface_mesh.number_of_vertices() << std::endl;
+    std::cout << "Nombres de faces : " << this->m_surface_mesh.number_of_faces() << std::endl;
     std::cout << std::endl;
 
     // Deuxième solution en récupérant la taille des tableaux contenant les sommets (fonction vertices() de Surface_mesh)
@@ -43,67 +43,63 @@ void SurfaceMesh::displaySurfaceMeshInfos() {
     // std::cout << "Nombres de faces : " << m_surface_mesh.faces().size() << std::endl;
 }
 
-void SurfaceMesh::computeVerticesValency() {
+std::tuple<std::map<vertex_descriptor, int>, int> SurfaceMesh::computeVerticesValency() {
     // Calcul de la valence de chaque sommet du maillage. 
-    m_vertex_valency.clear();
+    //m_vertex_valency.clear();
+    // Création d'une table associant à un sommet du maillage sa valence
+    std::map<vertex_descriptor, int> vertex_valency;
+    //Initialisation de la map
+    for(const auto& vertex : this->m_surface_mesh.vertices()){
+        vertex_valency[vertex] = 0;
+    }
+    // Ainsi qu'une variable contenant la valence maximale dans le maillage (utilisées pour la création du fichier CSV)
+    int max_valency = -10000;
     //La valence pour un sommet donné correspond au nombre
     // de sommets qui sont directement voisins de ce sommet. Une autre façon de définir la valence d'un sommet va être de calculer le
     // nombre d'arêtes possédant ce sommet comme membre. C'est la stratégie utilisée ici.
     // Nous commençons par parcourir les arêtes du maillage
-    for (edge_descriptor edge : m_surface_mesh.edges()) {
+    for (const auto& edge : m_surface_mesh.edges()) {
         // récupération d'une demi-arête associée à cette arête
         halfedge_descriptor he = m_surface_mesh.halfedge(edge);
         // récupération des deux sommets associés à cette demi-arête
         vertex_descriptor v1 = m_surface_mesh.source(he);
         vertex_descriptor v2 = m_surface_mesh.target(he);
 
-        // Incrémentation de la valence de ces deux sommets dans la propriété du maillage sur les valences
-        m_vertex_valency[v1]++;
-        m_vertex_valency[v2]++;
+        // Incrémentation de la valence de ces deux sommets dans la propriété du maillage sur les valences et mise à jour de la valeur de valence maximale
+        int v1_valency = ++vertex_valency[v1];
+        max_valency = std::max(max_valency, v1_valency);
+
+        int v2_valency = ++vertex_valency[v2];
+        max_valency = std::max(max_valency, v2_valency);
     }
+
+    return std::make_tuple(vertex_valency, max_valency);
 }
 
-void SurfaceMesh::displayValencyInfos() {
+void SurfaceMesh::displayValencyInfos(const std::map<vertex_descriptor, int>& vertex_valency) {
     //Affichage des valences des sommets du maillage
-    for (vertex_descriptor v : m_surface_mesh.vertices()) {
-        std::cout << "Valence de " << v << " : " << m_vertex_valency[v] << std::endl;
+    for (const auto& p : vertex_valency) {
+        std::cout << "Valence de " << p.first << " : " << p.second << std::endl;
     }
 }
 
-void SurfaceMesh::exportVerticesValencyAsCSV(const std::string csvFileName) {
-    // Nous allons nous servir de la propriété du maillage m_vertex_valency qui associe à chaque sommet du maillage sa valence associée.
+void SurfaceMesh::exportVerticesValencyAsCSV(const std::tuple<std::map<vertex_descriptor, int>, int>& data, const std::string csvFileName) {
     // Comme l'objectif est de pouvoir exporter les données de sorte à pouvoir réaliser un histogramme, nous allons préparer ces dernières
     // de sorte à pouvoir afficher un histogramme représentant le nombre de sommets en fonction de leur valence
-    // Création d'une map permettant de stocker ces nouvelles données (la clé représente la valence et la valeur le nombre de sommets ayant cette valence)
-    std::map<int, int> valency_data;
+    // Extraction des données contenues dans le tuple
+    std::map<vertex_descriptor, int> vertex_valency;
+    int max_valency;
 
-    // Si les valeurs minimum et maximum des valences des sommets n'ont pas encore été déterminées
-    if (!m_min_valency && !m_max_valency) {
-        //Nous commençons par rechercher la plus grande et la plus petite valeur de valence parmi toutes celles obtenues
-        int min_valency = 100;
-        int max_valency = 0;
+    std::tie(vertex_valency, max_valency) = data;
 
-        for(vertex_descriptor v : m_surface_mesh.vertices()) {
-            min_valency = std::min(m_vertex_valency[v], min_valency);
-            max_valency = std::max(m_vertex_valency[v], max_valency);
-        }
+    // Création d'un tableau contenant pour chaque indice i, le nombre de sommets ayant une valence de i + min_valency
+    std::vector<int> valency_data (max_valency + 1, 0);
+    std::cout << valency_data.size() << std::endl;
 
-        // Affectation des min et max obtenus aux attributs de la classe
-        m_min_valency = min_valency;
-        m_max_valency = max_valency;
-    }
-    
-    //Initialisation des données de valency_data
-    for(int i = m_min_valency; i <= m_max_valency; i++) {
-        valency_data[i] = 0;
-    }
-
-    // Nous parcourons la liste des sommets du maillage
-    for (vertex_descriptor v : m_surface_mesh.vertices()) {
-        // récupération de la valence associée à ce sommet dans la table de propriété
-        int valency = m_vertex_valency[v];
-        // incrémentation du nombre de sommets avec cette valence dans la map
-        valency_data[valency]++;
+    // Nous parcourons la table associant un sommet du maillage à sa valence
+    for (const auto& p : vertex_valency) {
+        // incrémentation du nombre de sommets avec la valence obtenue à l'indice i de vertex_valency
+        valency_data[p.second]++;
     }
 
     // Création du fichier d'exportation
@@ -118,8 +114,9 @@ void SurfaceMesh::exportVerticesValencyAsCSV(const std::string csvFileName) {
         // Nous commençons par écrire l'en-tête de ce fichier à savoir le titre des deux colonnes des données à exporter (valence et nombre de sommets)
         csvOutputFile << "Valence,Nombre de sommets\n";
         // Remplissage du fichier avec les données de valence
-        for (const auto& [key, value] : valency_data) {
-            csvOutputFile << key << "," << value << "\n";
+        for (int i = 0; i < valency_data.size(); i++) {
+            //std::cout << "test" << std::endl;
+            csvOutputFile << i << "," << valency_data[i] << "\n";
         }
 
         // Fermeture du fichier CSV
