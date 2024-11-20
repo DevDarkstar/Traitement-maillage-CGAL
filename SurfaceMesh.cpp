@@ -66,8 +66,8 @@ std::tuple<std::map<vertex_descriptor, int>, int> SurfaceMesh::computeVerticesVa
         vertex_descriptor v2 = m_surface_mesh.target(he);
 
         // Incrémentation de la valence de ces deux sommets dans la propriété du maillage sur les valences et mise à jour de la valeur de valence maximale
-        max_valency = std::max(max_valency, vertex_valency[v1]++);
-        max_valency = std::max(max_valency, vertex_valency[v2]++);
+        max_valency = std::max(max_valency, ++vertex_valency[v1]);
+        max_valency = std::max(max_valency, ++vertex_valency[v2]);
     }
 
     return std::make_tuple(vertex_valency, max_valency);
