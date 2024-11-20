@@ -125,7 +125,7 @@ std::tuple<std::map<face_descriptor, std::vector<double>>, std::map<face_descrip
     // Nous allons avoir besoin pour le calcul des angles dièdres entre faces adjacentes des coordonnées des sommets du maillage (contenue dans la structure de données
     // interne de la Surface Mesh de CGAL) ainsi que de la liste des sommets associés à une face (table de propriété m_face_vertices de la classe)
     // Récupération de la table de propriété des coordonnées des sommets du maillage
-    Surface_mesh::Property_map<vertex_descriptor, Point_3> vertices_coordinates = m_surface_mesh.property_map<vertex_descriptor, Point_3>("v:point").first;
+    Surface_mesh::Property_map<vertex_descriptor, Point_3> vertices_coordinates = this->m_surface_mesh.property_map<vertex_descriptor, Point_3>("v:point").first;
 
     // Les valeurs des angles dièdres (calculés ici en degré), seront stockées dans la table suivante où à chaque face seront associées les valeurs des angles diédres obtenus
     // entre la face courante et les faces adjacentes.
@@ -137,12 +137,16 @@ std::tuple<std::map<face_descriptor, std::vector<double>>, std::map<face_descrip
 
     // Remplissage de la table des normales aux faces en associant à chaque face du maillage le vecteur normal (de type Vector_3) correspondant
     for (const auto& face : this->m_surface_mesh.faces()) {
-        // Récupération de la liste des sommets associés à cette face
-        const std::vector<vertex_descriptor>& vertices = this->m_face_vertices[face];
+        // Récupération de la liste des coordonnées des sommets associés à cette face
+        std::vector<Point_3> vertex_coordinates;
+        for(const auto& vertex : vertices_around_face(this->m_surface_mesh.halfedge(face), this->m_surface_mesh)){
+            vertex_coordinates.push_back(vertices_coordinates[vertex]);
+        }
+        //const std::vector<vertex_descriptor>& vertices = this->m_face_vertices[face];
 
         // Calcul de deux vecteurs de cette face
-        Vector_3 v1 = vertices_coordinates[vertices[1]] - vertices_coordinates[vertices[0]];
-        Vector_3 v2 = vertices_coordinates[vertices[2]] - vertices_coordinates[vertices[0]];
+        Vector_3 v1 = vertex_coordinates[1] - vertex_coordinates[0];
+        Vector_3 v2 = vertex_coordinates[2] - vertex_coordinates[0];
 
         // Calcul du vecteur normal à cette face
         Vector_3 normal = CGAL::cross_product(v1, v2);
@@ -200,11 +204,11 @@ void SurfaceMesh::exportDihedralAnglesAsCSV(std::map<face_descriptor, std::vecto
     // Comme l'objectif est de pouvoir exporter les données de sorte à pouvoir réaliser un histogramme, nous allons préparer ces dernières
     // de sorte à pouvoir afficher un histogramme représentant le nombre d'occurences ayant une certaine valeur d'angle
     // De plus, afin de limiter la taille de l'histogramme, nous allons arrondir les valeurs d'angles obtenues à l'entier le plus proche
-    // Création d'une map permettant de stocker ces nouvelles données (la clé représente un intervalle de valeurs d'angle dièdre et la valeur le nombre d'occurrences trouvées dans cet intervalle)
-    std::map<int, int> dihedral_angles_data;
     // Création d'un tableau contenant les descriptions d'intervalles et qui seront utilisés pour créer le fichier csv
     std::vector<std::string> intervals = {"[0;5[","[5;10[","[10;15[","[15;20[","[20;25[","[25;30[","[30;35[","[35;40[","[40;45[","[45;50[","[50;55[","[55;60[","[60;65[","[65;70[","[70;75[","[75;80[","[80;85[","[85;90[",
-    "[90;95[","[95;100[","[100;105[","[105;110[","[110;115[","[115;120[","[120;125[","[125;130[","[125;130[","[130;135[","[135;140[","[140;145[","[145;150[","[150;155[","[155;160[","[160;165[","[165;170[","[170;175[","[175;180]"};
+    "[90;95[","[95;100[","[100;105[","[105;110[","[110;115[","[115;120[","[120;125[","[125;130[","[130;135[","[135;140[","[140;145[","[145;150[","[150;155[","[155;160[","[160;165[","[165;170[","[170;175[","[175;180]"};
+    // Création d'un tableau où, pour un indice i, est associé le nombre de faces possédant un angle dièdre avec une face adjacente compris dans un intervalle situé à l'indice i dans le tableau intervals ci-dessus 
+    std::vector<int> dihedral_angles_data(intervals.size(), 0);
 
     //Initialisation des valeurs pour les données des angles dièdres
     for(int i = 0; i < intervals.size(); i++){
@@ -237,9 +241,9 @@ void SurfaceMesh::exportDihedralAnglesAsCSV(std::map<face_descriptor, std::vecto
         csvOutputFile << "Intervalle angle dièdre,Nombre d'occurrences\n";
         // Remplissage du fichier avec les données des angles dièdres
         std::vector<std::string>::iterator it_keys = intervals.begin();
-        std::map<int, int>::iterator it_values = dihedral_angles_data.begin();
+        std::vector<int>::iterator it_values = dihedral_angles_data.begin();
         for(; it_keys != intervals.end() && it_values != dihedral_angles_data.end(); ++it_keys, ++it_values) {
-            csvOutputFile << *it_keys << "," << (*it_values).second << "\n";
+            csvOutputFile << *it_keys << "," << *it_values << "\n";
         }
 
         // Fermeture du fichier CSV
@@ -248,74 +252,44 @@ void SurfaceMesh::exportDihedralAnglesAsCSV(std::map<face_descriptor, std::vecto
     }
 }
 
-void SurfaceMesh::computeAreaOfFaces() {
-    m_face_area.clear();
-    // Nous allons avoir besoin pour le calcul des aires des faces des coordonnées des sommets du maillage (contenue dans la structure de données
-    // interne de la Surface Mesh de CGAL) ainsi que de la liste des sommets associés à une face (table de propriété m_face_vertices de la classe)
-    // Récupération de la table de propriété des coordonnées des sommets du maillage
-    Surface_mesh::Property_map<vertex_descriptor, Point_3> vertices_coordinates = m_surface_mesh.property_map<vertex_descriptor, Point_3>("v:point").first;
+std::map<face_descriptor, double> SurfaceMesh::computeFaceArea(std::map<face_descriptor, Vector_3>& face_normal) {
+    // Création d'une table associant à une face son aire
+    std::map<face_descriptor, double> face_area;
 
-    // Calcul de l'aire des faces (le résultat sera stocké dans la table de propriété m_face_area)
+    // Calcul de l'aire des faces (le résultat sera stocké dans la table de propriété face_area)
     // Parcours de la liste des faces du maillage
-    for (face_descriptor face : m_surface_mesh.faces()) {
-        // Récupération de la liste des sommets de cette face
-        std::vector<vertex_descriptor> vertices = m_face_vertices[face];
-        // Si la face est triangulaire
-        if (vertices.size() == 3) {
-            // Récupération des coordonnées des trois sommets de la face
-            Point_3 v1 = vertices_coordinates[vertices[0]];
-            Point_3 v2 = vertices_coordinates[vertices[1]];
-            Point_3 v3 = vertices_coordinates[vertices[2]];
+    for (const auto& face : m_surface_mesh.faces()) {
+        // L'aire d'une face se calcule en faisant la norme du produit vectoriel de deux vecteurs appartenant à cette face, le tout multiplié par 1/2
+        // Autrement dit, nous pouvons également la calculer en faisant la norme du produit vectoriel du vecteur normal à la face, le tout multiplié par 1/2
+        // Aire = 1 / 2 * || v1 ^ v2 || = 1 / 2 * || N || où N = v1 ^ v2
+        // Récupération de la normale à la face courante
+        Vector_3 normale = face_normal[face];
 
-            // Calcul de l'aire du triangle en utilisant la formule suivante
-            //                |     | x1 y1 z1 ||
-            // Aire = 1 / 2 * | det | x2 y2 z2 ||
-            //                |     | x3 y3 z3 ||
-
-            double area = 0.5 * CGAL::abs(v1.x()*v2.y()*v3.z() - v1.x()*v3.y()*v2.z() - v2.x()*v1.y()*v3.z() + v2.x()*v3.y()*v1.z() + v3.x()*v1.y()*v2.z() - v3.x()*v2.y()*v1.z());
-
-            // Stockage de l'aire de la face résultante dans la table de propriété
-            m_face_area[face] = area;
-        }
-        // Sinon elle est quadrangulaire
-        else {
-            // Récupération des coordonnées des quatre sommets de la face
-            Point_3 v1 = vertices_coordinates[vertices[0]];
-            Point_3 v2 = vertices_coordinates[vertices[1]];
-            Point_3 v3 = vertices_coordinates[vertices[2]];
-            Point_3 v4 = vertices_coordinates[vertices[3]];
-
-            // Calcul de l'aire de la face en la subdivisant en deux faces triangulaires, puis calcul de l'aire des deux triangles
-            // L'aire de la face quadrangulaire correspondra à la somme de ces deux aires
-            // Première aire en prenant les sommets v1, v2 et v3
-            double area1 = 0.5 * CGAL::abs(v1.x()*v2.y()*v3.z() - v1.x()*v3.y()*v2.z() - v2.x()*v1.y()*v3.z() + v2.x()*v3.y()*v1.z() + v3.x()*v1.y()*v2.z() - v3.x()*v2.y()*v1.z());
-            // Seconde aire en prenant les sommets v3, v4 et v1
-            double area2 = 0.5 * CGAL::abs(v3.x()*v4.y()*v1.z() - v3.x()*v1.y()*v4.z() - v4.x()*v3.y()*v1.z() + v4.x()*v1.y()*v3.z() + v1.x()*v3.y()*v4.z() - v1.x()*v4.y()*v3.z());
-
-            // Stockage de l'aire de la face résultante dans la table de propriété
-            m_face_area[face] = area1 + area2;
-        }
+        // Calcul et stockage de l'aire de la face dans la table face_area
+        face_area[face] = 0.5 * CGAL::sqrt(normale.squared_length());
     }
+    return face_area;
 }
 
-void SurfaceMesh::displayFaceAreaInfos() {
+void SurfaceMesh::displayFaceAreaInfos(const std::map<face_descriptor, double>& face_area) {
     // Affichage de l'aire des faces du maillage
-    for(face_descriptor face : m_surface_mesh.faces()) {
-        std::cout << "Face " << face << " : aire = " << m_face_area[face] << " m²" << std::endl;
+    for(const auto& p : face_area) {
+        std::cout << "Face " << p.first << " : aire = " << p.second << " m²" << std::endl;
     }
 }
 
-void SurfaceMesh::computeGaussianCurvature() {
-    m_vertex_gaussian_curvature.clear();
+std::map<vertex_descriptor, double> SurfaceMesh::computeGaussianCurvature(std::map<face_descriptor, double>& face_area, std::map<face_descriptor, Vector_3>& face_normal) {
+    //m_vertex_gaussian_curvature.clear();
     // La technique utilisée ici est une approche en approximant la courbure gaussienne de chaque sommet du maillage en utilisant 
     // les normales et les aires des faces
     // Comme nous allons utiliser l'aire des faces dans ce calcul et que le résultat de la courbure y est directement lié,
     // nous devons donc normaliser les courbures gaussiennes résultantes afin de pouvoir généraliser le code couleur de la carte de courbure gaussienne
     // à des maillages de tailles diverses
+    std::map<vertex_descriptor, double> vertex_gaussian_curvature;
 
-    // Calcul des approximations de courbure gaussienne (le résultat sera stocké dans la table de propriété m_vertex_gaussian_curvature)
+    // Calcul des approximations de courbure gaussienne (le résultat sera stocké dans la table de propriété vertex_gaussian_curvature)
     // Parcours de l'ensemble des sommets du maillage 
-    for (vertex_descriptor vertex : m_surface_mesh.vertices()) {
+    for (const auto& vertex : this->m_surface_mesh.vertices()) {
         /*if(m_surface_mesh.is_border(vertex)){
             std::cout << "Sommet de bord" << std::endl;
         } else {
@@ -326,21 +300,21 @@ void SurfaceMesh::computeGaussianCurvature() {
         // Création d'une variable pour la somme des aires des faces ayant ce sommet comme membre
         double area_sum = 0.0;
         // Récupération d'une demi-arête ayant ce sommet comme target
-        halfedge_descriptor he_target = m_surface_mesh.halfedge(vertex);
+        halfedge_descriptor he_target = this->m_surface_mesh.halfedge(vertex);
         // Parcours de l'ensemble des demi-arêtes autour de ce sommet
-        for (halfedge_descriptor he : m_surface_mesh.halfedges_around_target(he_target)) {
+        for (const auto& he : this->m_surface_mesh.halfedges_around_target(he_target)) {
             // Si l'arête contenant cette demi-arête n'est pas une arête de bord du maillage
-            if (!m_surface_mesh.is_border(m_surface_mesh.edge(he))) {
+            if (!this->m_surface_mesh.is_border(this->m_surface_mesh.edge(he))) {
                 // Récupération des deux faces ayant cette arête en commun
-                face_descriptor f1 = m_surface_mesh.face(he);
-                face_descriptor f2 = m_surface_mesh.face(m_surface_mesh.opposite(he));
+                face_descriptor f1 = this->m_surface_mesh.face(he);
+                face_descriptor f2 = this->m_surface_mesh.face(this->m_surface_mesh.opposite(he));
 
                 // Ajout de l'aire de la deuxième face à la somme des aires
-                area_sum += m_face_area[f1];
+                area_sum += face_area[f1];
 
                 // Récupération des normales à ces deux faces
-                Vector_3 n1 = m_face_normal[f1];
-                Vector_3 n2 = m_face_normal[f2];
+                Vector_3 n1 = face_normal[f1];
+                Vector_3 n2 = face_normal[f2];
                 // Calcul de la norme de ces deux vecteurs
                 double n1_norm = CGAL::sqrt(n1.squared_length());
                 double n2_norm = CGAL::sqrt(n2.squared_length());
@@ -350,8 +324,8 @@ void SurfaceMesh::computeGaussianCurvature() {
                 angle_sum += angle;
             }
             else {
-                face_descriptor face = m_surface_mesh.face(m_surface_mesh.opposite(he));
-                area_sum += m_face_area[face];
+                face_descriptor face = this->m_surface_mesh.face(this->m_surface_mesh.opposite(he));
+                area_sum += face_area[face];
             }
         }
         //std::cout << vertex << " somme des angles : " << angle_sum << ", somme des aires : " << area_sum << std::endl;
@@ -361,30 +335,31 @@ void SurfaceMesh::computeGaussianCurvature() {
         if(std::isnan(gaussian_curvature)) {
             gaussian_curvature = 0.0;
         }
-        m_vertex_gaussian_curvature[vertex] = gaussian_curvature;
+        vertex_gaussian_curvature[vertex] = gaussian_curvature;
     }
 
     // Création d'une variable contenant la somme des courbures gaussiennes des sommets
     double sum = 0.0;
 
-    for (vertex_descriptor v : m_surface_mesh.vertices()) {
-        sum += m_vertex_gaussian_curvature[v];
+    for (const auto& vertex : this->m_surface_mesh.vertices()) {
+        sum += vertex_gaussian_curvature[vertex];
     }
 
-    double average_area = sum / m_surface_mesh.number_of_faces();
+    double average_area = sum / this->m_surface_mesh.number_of_faces();
 
     // Normalisation des valeurs 
-    for (vertex_descriptor v : m_surface_mesh.vertices()) {
-        m_vertex_gaussian_curvature[v] /= average_area;
+    for (const auto& vertex : this->m_surface_mesh.vertices()) {
+        vertex_gaussian_curvature[vertex] /= average_area;
     }
 
     // Affichage des résultats
     /*for (vertex_descriptor vertex : m_surface_mesh.vertices()) {
         std::cout << "Sommet " << vertex << ", courbure gaussienne: " << m_vertex_gaussian_curvature[vertex] << std::endl;
     }*/
+    return vertex_gaussian_curvature;
 }
 
-void SurfaceMesh::exportGaussianCurvatureAsOBJ(const std::string objFileName, bool surface_mesh_indices) {
+void SurfaceMesh::exportGaussianCurvatureAsOBJ(std::map<vertex_descriptor, double>& vertex_gaussian_curvature, const std::string objFileName, bool is_decimated) {
     // Construction d'un fichier obj stockant à la fois les coordonnées des sommets et les couleurs de chacun d'entre eux
     // Sur Blender par exemple, les couleurs des sommets peuvent être voir en passant en mode "Vertex Paint"
     
@@ -409,7 +384,7 @@ void SurfaceMesh::exportGaussianCurvatureAsOBJ(const std::string objFileName, bo
             objOutputFile << "v " << coordinates.x() << " " << coordinates.y() << " " << coordinates.z() << " ";
 
             // Récupération de la courbure gaussienne de ce sommet
-            double gaussian_curvature = m_vertex_gaussian_curvature[v];
+            double gaussian_curvature = vertex_gaussian_curvature[v];
             // et stockage de la couleur associée à ce sommet en angle de la courbure
             // Si la valeur est supérieur strictement à 0.9, le sommet sera blanc
             if (gaussian_curvature > 5) {
@@ -453,16 +428,17 @@ void SurfaceMesh::exportGaussianCurvatureAsOBJ(const std::string objFileName, bo
             }
         }
         // Si nous utilisons les indices des sommets contenus dans la surface mesh (cas avant l'algorithme de décimation)
-        if (surface_mesh_indices) {
+        if (!is_decimated) {
             // Remplissage du fichier obj avec les indices des sommets des faces du maillage
             for (face_descriptor f : m_surface_mesh.faces()) {
                 // Récupération des sommets composants cette face
-                std::vector<vertex_descriptor> vertices = m_face_vertices[f];
-                // Et écriture de leur indice dans le fichier
+                //std::vector<vertex_descriptor> vertices = m_face_vertices[f];
                 objOutputFile << "f ";
-                for (vertex_descriptor v : vertices) {
-                    objOutputFile << v.idx() + 1 << " ";
-                }
+                // Parcours des sommets appartenant à la face
+                for(const auto& vertex : vertices_around_face(this->m_surface_mesh.halfedge(f), this->m_surface_mesh)){
+                    // Et écriture de leur indice dans le fichier
+                    objOutputFile << vertex.idx() + 1 << " ";
+                }             
                 objOutputFile << "\n";
             }
         }
@@ -603,7 +579,7 @@ void SurfaceMesh::readPlyFile(const std::string& filepath, bool preload_into_mem
             // ajout de la face triangulaire aux données du maillage
             face_descriptor face = m_surface_mesh.add_face(vertices_descriptor[lface.x], vertices_descriptor[lface.y], vertices_descriptor[lface.z]);
             // association de la liste des sommets de la face à la face du maillage correspondante
-            m_face_vertices[face] = {vertices_descriptor[lface.x], vertices_descriptor[lface.y], vertices_descriptor[lface.z]};
+            //m_face_vertices[face] = {vertices_descriptor[lface.x], vertices_descriptor[lface.y], vertices_descriptor[lface.z]};
         }
     }
     catch (const std::exception & e)
@@ -684,6 +660,6 @@ void SurfaceMesh::readObjFile(const std::string& filepath)
         // ajout de la face triangulaire aux données du maillage
         face_descriptor face = m_surface_mesh.add_face(vertices_descriptor[indices[0]], vertices_descriptor[indices[1]], vertices_descriptor[indices[2]]);
         // association de la liste des sommets de la face à la face du maillage correspondante
-        m_face_vertices[face] = {vertices_descriptor[indices[0]], vertices_descriptor[indices[1]], vertices_descriptor[indices[2]]};
+        //m_face_vertices[face] = {vertices_descriptor[indices[0]], vertices_descriptor[indices[1]], vertices_descriptor[indices[2]]};
     }
 }

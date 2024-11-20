@@ -32,12 +32,12 @@ class SurfaceMesh{
     std::tuple<std::map<face_descriptor, std::vector<double>>, std::map<face_descriptor, Vector_3>> computeDihedralAngles(); // Calcul des angles dièdres entre les faces adjacentes entre elles
     void displayDihedralAnglesInfos(const std::map<face_descriptor, std::vector<double>>& dihedral_angles) const; // Affiche dans la console le nom des faces du maillage et, pour chacune d'entre elles, la liste des faces d'indice plus elevé qui lui sont associées ainsi que la valeur de l'angle dièdre (en degré) entre ces deux faces
     void exportDihedralAnglesAsCSV(std::map<face_descriptor, std::vector<double>>& dihedral_angles, const std::string csv_filename); // Exportation des valeurs des angles dièdres en fonction du nombre d'occurrences au format CSV
-    void computeAreaOfFaces(); // Calcul de l'aire des faces du maillage
-    void displayFaceAreaInfos(); // Affiche la l'identifiant des faces du maillage et l'aire qui leur est associée
-    void computeGaussianCurvature(); // Calcul de l'approximation de la courbure gaussienne à chaque sommet du maillage
-    void exportGaussianCurvatureAsOBJ(const std::string filename, bool surface_mesh_indices); // Exportation du maillage avec un code couleur associé aux courbures gaussiennes de chaque sommet dans un fichier OBJ
+    std::map<face_descriptor, double> computeFaceArea(std::map<face_descriptor, Vector_3>& face_normal); // Calcul de l'aire des faces du maillage
+    void displayFaceAreaInfos(const std::map<face_descriptor, double>& face_area); // Affiche la l'identifiant des faces du maillage et l'aire qui leur est associée
+    std::map<vertex_descriptor, double> computeGaussianCurvature(std::map<face_descriptor, double>& face_area, std::map<face_descriptor, Vector_3>& face_normal); // Calcul de l'approximation de la courbure gaussienne à chaque sommet du maillage
+    void exportGaussianCurvatureAsOBJ(std::map<vertex_descriptor, double>& vertex_gaussian_curvature, const std::string filename, bool is_decimated); // Exportation du maillage avec un code couleur associé aux courbures gaussiennes de chaque sommet dans un fichier OBJ
     void triangulated_surface_mesh_simplification(); // Application de l'algorithme de décimation sur la surface mesh contenue dans l'attribut m_surface_mesh
-    std::map<vertex_descriptor, int> getIndicesRemapping(); // Permet de rédéfinir les indices associés aux sommets de la surface mesh après l'algorithme de décimation
+    std::map<vertex_descriptor, int> getIndicesRemapping(); // Permet de redéfinir les indices associés aux sommets de la surface mesh après l'algorithme de décimation
     void readPlyFile(const std::string& filepath, bool preload_into_memory); // Lecture d'un fichier au format .ply en utilisant tinyply
     void readObjFile(const std::string& filepath); // Lecture d'un fichier au format .obj
 
@@ -50,13 +50,13 @@ class SurfaceMesh{
     //int m_min_valency;
     //int m_max_valency;
     // Propriétés associées au maillage créé
-    std::map<face_descriptor, std::vector<vertex_descriptor>> m_face_vertices; // Associe à chaque face du maillage les sommets lui appartenant
+    //std::map<face_descriptor, std::vector<vertex_descriptor>> m_face_vertices; // Associe à chaque face du maillage les sommets lui appartenant
     //std::map<vertex_descriptor, int> m_vertex_valency; // Associe à chaque sommet du maillage la valence correspondante
-    std::map<face_descriptor, Vector_3> m_face_normal; // Associe à chaque face du maillage sa normale correspondante
+    //std::map<face_descriptor, Vector_3> m_face_normal; // Associe à chaque face du maillage sa normale correspondante
     //std::map<face_descriptor, std::vector<face_descriptor>> m_adjacent_faces; // Associe à chaque face du maillage la liste des faces (avec un indice plus élevé) qui lui sont adjacentes
     //std::map<face_descriptor, std::vector<double>> m_dihedral_angles; // Associe à chaque face du maillage la liste des angles dièdres entre la face courante et les faces qui lui sont adjacentes
-    std::map<face_descriptor, double> m_face_area; // Associe à chaque face du maillage son aire correspondante
-    std::map<vertex_descriptor, double> m_vertex_gaussian_curvature; // Associe à chaque sommet du maillage une approximation de sa courbure gaussienne
+    //std::map<face_descriptor, double> m_face_area; // Associe à chaque face du maillage son aire correspondante
+    //std::map<vertex_descriptor, double> m_vertex_gaussian_curvature; // Associe à chaque sommet du maillage une approximation de sa courbure gaussienne
 };
 
 #endif
