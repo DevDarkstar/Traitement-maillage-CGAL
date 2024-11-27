@@ -179,7 +179,7 @@ std::tuple<std::map<face_descriptor, std::vector<double>>, std::map<face_descrip
                 // Calcul de l'angle dièdre entre cette face et la face courante en degrés (compris entre 0 et 180°)
                 double dihedral_angle = std::acos((normal * adjacent_normal) / (norm * adjacent_norm)) * 180 / CGAL_PI;
                 // Ajout de l'angle dièdre à la table de propriété
-                dihedral_angles[face].push_back(dihedral_angle);
+                dihedral_angles[face].push_back(std::isnan(dihedral_angle) ? 0.0 : dihedral_angle);
             }
         }
     }
@@ -263,10 +263,10 @@ std::map<face_descriptor, double> SurfaceMesh::computeFaceArea(std::map<face_des
         // Autrement dit, nous pouvons également la calculer en faisant la norme du produit vectoriel du vecteur normal à la face, le tout multiplié par 1/2
         // Aire = 1 / 2 * || v1 ^ v2 || = 1 / 2 * || N || où N = v1 ^ v2
         // Récupération de la normale à la face courante
-        Vector_3 normale = face_normal[face];
+        Vector_3 normal = face_normal[face];
 
         // Calcul et stockage de l'aire de la face dans la table face_area
-        face_area[face] = 0.5 * CGAL::sqrt(normale.squared_length());
+        face_area[face] = 0.5 * CGAL::sqrt(normal.squared_length());
     }
     return face_area;
 }
@@ -332,10 +332,7 @@ std::map<vertex_descriptor, double> SurfaceMesh::computeGaussianCurvature(std::m
         // Calcul de l'approximation de la courbure gaussienne pour ce sommet
         double gaussian_curvature = (2 * CGAL_PI - angle_sum) / area_sum;
         // et ajout du résultat à la table de propriété
-        if(std::isnan(gaussian_curvature)) {
-            gaussian_curvature = 0.0;
-        }
-        vertex_gaussian_curvature[vertex] = gaussian_curvature;
+        vertex_gaussian_curvature[vertex] = std::isnan(gaussian_curvature) ? 0.0 : gaussian_curvature;
     }
 
     // Création d'une variable contenant la somme des courbures gaussiennes des sommets
@@ -352,9 +349,9 @@ std::map<vertex_descriptor, double> SurfaceMesh::computeGaussianCurvature(std::m
         vertex_gaussian_curvature[vertex] /= average_area;
     }
 
-    // Affichage des résultats
+    // Affichage des résultats (débogage)
     /*for (vertex_descriptor vertex : m_surface_mesh.vertices()) {
-        std::cout << "Sommet " << vertex << ", courbure gaussienne: " << m_vertex_gaussian_curvature[vertex] << std::endl;
+        std::cout << "Sommet " << vertex << ", courbure gaussienne: " << vertex_gaussian_curvature[vertex] << std::endl;
     }*/
     return vertex_gaussian_curvature;
 }
@@ -470,15 +467,15 @@ void SurfaceMesh::triangulated_surface_mesh_simplification(){
     {
         throw std::runtime_error("Le maillage n'est pas composé que de faces triangulaires...");
     }
-
+    std::cout << "\nNombre d'arêtes initiales : " << m_surface_mesh.number_of_edges() << ".";
     std::chrono::steady_clock::time_point start_time = std::chrono::steady_clock::now();
     // In this example, the simplification stops when the number of undirected edges
     // drops below 10% of the initial count
     SMS::Edge_count_ratio_stop_predicate<Surface_mesh> stop(m_decimation_factor);
     int r = SMS::edge_collapse(m_surface_mesh, stop);
     std::chrono::steady_clock::time_point end_time = std::chrono::steady_clock::now();
-    std::cout << "\nFinished!\n" << r << " edges removed.\n" << m_surface_mesh.number_of_edges() << " final edges.\n";
-    std::cout << "Time elapsed: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() << "ms" << std::endl;
+    std::cout << "\nAlgorithme terminé!\n" << r << " arêtes supprimées.\n" << m_surface_mesh.number_of_edges() << " arêtes restantes.\n";
+    std::cout << "Temps d'exécution : " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() << "ms" << std::endl;
     std::cout << std::endl;
 }
 
@@ -503,8 +500,6 @@ void SurfaceMesh::readPlyFile(const std::string& filepath, bool preload_into_mem
 
     try
     {
-        // For most files < 1gb, pre-loading the entire file upfront and wrapping it into a 
-        // stream is a net win for parsing speed, about 40% faster.
         //Le preloading permet de stocker l'ensemble du fichier en RAM pour aller plus vite. A priori pour les fichiers < 1Go
         if (preload_into_memory)
         {
@@ -526,8 +521,6 @@ void SurfaceMesh::readPlyFile(const std::string& filepath, bool preload_into_mem
         PlyFile file;
         file.parse_header(*file_stream);
 
-        // Because most people have their own mesh types, tinyply treats parsed data as structured/typed byte buffers. 
-        // See examples below on how to marry your own application-specific data structures with this one. 
         std::shared_ptr<PlyData> vertices, normals, colors, texcoords, faces, tripstrip;
         
         //Parmi toutes les données lues, nous ne conserverons que les coordonnées des sommets et les indices des sommets des faces
@@ -578,8 +571,6 @@ void SurfaceMesh::readPlyFile(const std::string& filepath, bool preload_into_mem
         {
             // ajout de la face triangulaire aux données du maillage
             face_descriptor face = m_surface_mesh.add_face(vertices_descriptor[lface.x], vertices_descriptor[lface.y], vertices_descriptor[lface.z]);
-            // association de la liste des sommets de la face à la face du maillage correspondante
-            //m_face_vertices[face] = {vertices_descriptor[lface.x], vertices_descriptor[lface.y], vertices_descriptor[lface.z]};
         }
     }
     catch (const std::exception & e)
@@ -659,7 +650,5 @@ void SurfaceMesh::readObjFile(const std::string& filepath)
         const std::array<int,3>& indices = face_indices[i];
         // ajout de la face triangulaire aux données du maillage
         face_descriptor face = m_surface_mesh.add_face(vertices_descriptor[indices[0]], vertices_descriptor[indices[1]], vertices_descriptor[indices[2]]);
-        // association de la liste des sommets de la face à la face du maillage correspondante
-        //m_face_vertices[face] = {vertices_descriptor[indices[0]], vertices_descriptor[indices[1]], vertices_descriptor[indices[2]]};
     }
 }
