@@ -1,9 +1,10 @@
 #!/bin/bash
 
 # Vérification si l'utilisateur a renseigné le paramètre de facteur de décimation lors de l'exécution du script
-if [[ $# -ne 1 ]]; then
-    echo "Vous devez renseigner le facteur de décimation à appliquer sur les maillages..."
-    echo "La commande d'exécution du script doit être du type "$0" <facteur_décimation>."
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+    echo "Erreur dans l'exécution du script bash..."
+    echo "Vous devez renseigner au moins le facteur de décimation à appliquer sur les maillages..."
+    echo "La commande d'exécution du script doit être "$0" <facteur_décimation> ou "$0" <facteur_décimation> <nom_fichier>"
     exit 1
 fi
 
@@ -21,6 +22,8 @@ MESH_DIR="objets_3D"
 DIAGRAMS_DIR="diagrammes"
 # Dossier qui contiendra les maillages, au format .obj, contenant les cartes de courbures
 MESHES_DIR="maillages"
+# Dossier contenant l'environnement virtuel de python (utilisé pour générer des diagrammes depuis des fichiers .csv en utilisant Matplotlib)
+PYTHON_VENV="env"
 
 # Vérification si CGAL est bien installé
 if [[ ! -d "$DIR_NAME" ]]; then
@@ -57,7 +60,7 @@ if [[ ! -d "$BUILD_DIR" ]]; then
     mkdir "$BUILD_DIR"
 fi
 
-# Se rendre dans le dossier "build"
+# Déplacement dans le dossier de compilation "build"
 cd "$BUILD_DIR" || exit
 
 # Exécution du cmake
@@ -72,9 +75,32 @@ fi
 # Compilation du programme
 make
 
+# Vérification si la compilation s'est bien déroulée
+if [[ $? -ne 0 ]]; then
+    echo "Erreur lors de l'exécution du make"
+    exit 1
+fi
+
 echo "Compilation du programme réussie."
 
-# Exécution du programme pour chaque maillage présent dans le dossier "objets_3D"
-for file in "../"$MESH_DIR/*; do
-    ./main $file $DECIMATION_FACTOR
+# Exécution du programme pour chaque maillage présent dans le dossier "objets_3D" ou pour un maillage en particulier selon le choix de l'utilisateur
+if [[ $# -eq 1 ]]; then
+    for file in ../$MESH_DIR/*; do
+        ./main $file $DECIMATION_FACTOR
+    done
+else
+    ./main ../$MESH_DIR/$2 $DECIMATION_FACTOR
+fi
+
+# Nous remontons d'un cran dans l'arborescence du projet
+cd ..
+
+# Conversion de tous les fichiers au format .csv en diagramme exploitable par l'utilisateur
+for file in $DIAGRAMS_DIR/*.csv; do
+    # Transformation du fichier .csv en diagramme en barres au format .png en utilisant le module matplotlib de python
+    python3 csv_to_png_diagram_converter.py "$file"
+    # et suppression du fichier .csv après la création de l'image
+    if [[ $? -eq 0 ]]; then
+        rm -f "$file"
+    fi
 done

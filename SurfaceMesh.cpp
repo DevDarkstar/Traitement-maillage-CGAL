@@ -108,7 +108,13 @@ void SurfaceMesh::exportVerticesValencyAsCSV(const std::tuple<std::map<vertex_de
 
     // Création du fichier d'exportation
     // Création du nom du fichier d'exportation
-    const std::string csv_filename = this->m_mesh_name + csvFilename;
+    std::string decimation_factor = std::to_string(this->m_decimation_factor);
+    std::remove(decimation_factor.begin(), decimation_factor.end(), '.');
+    std::string reduced_decimation_factor = "";
+    for (int i = 0; i < 3; i++){
+        reduced_decimation_factor += decimation_factor[i];
+    }
+    const std::string csv_filename = this->m_mesh_name + "-" + reduced_decimation_factor + csvFilename;
     // Ouverture du fichier en mode écriture
     std::ofstream csvOutputFile(csv_filename);
 
@@ -251,7 +257,14 @@ void SurfaceMesh::exportDihedralAnglesAsCSV(std::map<face_descriptor, std::vecto
 
     // Création du fichier d'exportation
     // Création du nom du fichier d'exportation
-    const std::string csv_filename = this->m_mesh_name + csvFilename;
+    // Récupération de la valeur du facteur de décimation
+    std::string decimation_factor = std::to_string(this->m_decimation_factor);
+    std::remove(decimation_factor.begin(), decimation_factor.end(), '.');
+    std::string reduced_decimation_factor = "";
+    for (int i = 0; i < 3; i++){
+        reduced_decimation_factor += decimation_factor[i];
+    }
+    const std::string csv_filename = this->m_mesh_name + "-" + reduced_decimation_factor + csvFilename;
     // Ouverture du fichier en mode écriture
     std::ofstream csvOutputFile(csv_filename);
 
@@ -261,7 +274,7 @@ void SurfaceMesh::exportDihedralAnglesAsCSV(std::map<face_descriptor, std::vecto
     // sinon il est ouvert et nous pouvons écrire à l'intérieur
     } else {
         // Nous commençons par écrire l'en-tête de ce fichier à savoir le titre des deux colonnes des données à exporter (angle dièdre et nombre d'occurrences)
-        csvOutputFile << "Intervalle angle dièdre,Nombre d'occurrences\n";
+        csvOutputFile << "Intervalle angle dièdre,Nombre de sommets\n";
         // Remplissage du fichier avec les données des angles dièdres
         std::vector<std::string>::iterator it_keys = intervals.begin();
         std::vector<int>::iterator it_values = dihedral_angles_data.begin();
@@ -631,7 +644,7 @@ void SurfaceMesh::readObjFile(const std::string& filepath)
     //Ouverture du fichier .obj
     std::ifstream objFile(filepath);
     if (!objFile) {
-        throw std::runtime_error("Le fichier .obj n'a pas pu être ouvert. Vérifiez le chemin vers votre fichier .obj.");
+        throw std::runtime_error("Le fichier .obj n'a pas pu être ouvert. Vérifiez le chemin vers votre fichier .obj ou son nom.");
     }
 
     //création d'un tableau de vertex_descriptor qui va contenir les informations des coordonnées des sommets du maillage

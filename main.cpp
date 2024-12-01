@@ -27,12 +27,12 @@ int main(int argc, char* argv[]){
     std::tuple<std::map<vertex_descriptor, int>, int> mesh_vertex_valency = surface_mesh.computeVerticesValency();
     //surface_mesh.displayValencyInfos(std::get<0>(mesh_vertex_valency));
     // Exportation des valences des sommets au format CSV
-    surface_mesh.exportVerticesValencyAsCSV(mesh_vertex_valency, "_valency.csv");
+    surface_mesh.exportVerticesValencyAsCSV(mesh_vertex_valency, "-valency.csv");
     // Calcul des angles dièdres des faces adjacentes entre elles
     std::tuple<std::map<face_descriptor, std::vector<double>>, std::map<face_descriptor, Vector_3>> mesh_dihedral_angles = surface_mesh.computeDihedralAngles();
     //surface_mesh.displayDihedralAnglesInfos(std::get<0>(mesh_dihedral_angles));
     // Exportation des valeurs des angles dièdres en fonction de leur nombre d'occurrences au format CSV
-    surface_mesh.exportDihedralAnglesAsCSV(std::get<0>(mesh_dihedral_angles), "_dihedral_angles.csv");
+    surface_mesh.exportDihedralAnglesAsCSV(std::get<0>(mesh_dihedral_angles), "-dihedral_angles.csv");
     // Calcul de l'aire des faces du maillage
     std::map<face_descriptor, double> face_area = surface_mesh.computeFaceArea(std::get<1>(mesh_dihedral_angles));
     //surface_mesh.displayFaceAreaInfos(face_area);
@@ -51,14 +51,14 @@ int main(int argc, char* argv[]){
     std::tuple<std::map<vertex_descriptor, int>, int> decimated_mesh_vertex_valency = surface_mesh.computeVerticesValency();
     //surface_mesh.displayValencyInfos(std::get<0>(decimated_mesh_vertex_valency));
     // Exportation des valences des sommets au format CSV
-    surface_mesh.exportVerticesValencyAsCSV(decimated_mesh_vertex_valency, "_valency_decimated.csv");
+    surface_mesh.exportVerticesValencyAsCSV(decimated_mesh_vertex_valency, "-valency_decimated.csv");
     // Calcul des angles dièdres des faces adjacentes entre elles
     //surface_mesh.computeDihedralAngles();
     std::tuple<std::map<face_descriptor, std::vector<double>>, std::map<face_descriptor, Vector_3>> decimated_mesh_dihedral_angles = surface_mesh.computeDihedralAngles();
     //surface_mesh.displayDihedralAnglesInfos(std::get<0>(decimated_mesh_dihedral_angles));
     // Exportation des valeurs des angles dièdres en fonction de leur nombre d'occurrences au format CSV
     //surface_mesh.exportDihedralAnglesAsCSV("../dihedral_angles_decimated.csv");
-    surface_mesh.exportDihedralAnglesAsCSV(std::get<0>(decimated_mesh_dihedral_angles), "_dihedral_angles_decimated.csv");
+    surface_mesh.exportDihedralAnglesAsCSV(std::get<0>(decimated_mesh_dihedral_angles), "-dihedral_angles_decimated.csv");
     // Calcul de l'aire des faces du maillage
     //surface_mesh.computeAreaOfFaces();
     std::map<face_descriptor, double> decimated_face_area = surface_mesh.computeFaceArea(std::get<1>(decimated_mesh_dihedral_angles));
