@@ -7,25 +7,33 @@
 #include <chrono>
 #include "tinyply.h"
 #include "plyUtils.hpp"
+#include <cstdlib>
 
 using namespace tinyply;
 namespace SMS = CGAL::Surface_mesh_simplification;
 
 SurfaceMesh::SurfaceMesh(const std::string& filepath, float decimation_factor) : m_decimation_factor(decimation_factor) {
-    //Récupération de l'extension du fichier à lire
-    std::string extension = filepath.substr(filepath.find_last_of('.') + 1);
-    //Si le fichier a pour extension .obj
+    // Récupération du nom du fichier contenant le maillage
+    std::string filename = filepath.substr(filepath.find_last_of('/') + 1);
+    const size_t dot_position = filename.find_last_of('.');
+    // Récupération du nom du maillage
+    this->m_mesh_name = filename.substr(0, dot_position);
+    // Récupération de l'extension du fichier à lire
+    const std::string extension = filename.substr(dot_position + 1);
+    // Si le fichier a pour extension .obj
     if(extension == "obj"){
         this->readObjFile(filepath);
     }
-    //sinon si le fichier a pour extension .ply
+    // sinon si le fichier a pour extension .ply
     else if(extension == "ply"){
         this->readPlyFile(filepath, true);
     }
-    //sinon nous levons une exception
+    // sinon nous levons une exception
     else{
         throw std::runtime_error("Le fichier lu doit avoir pour extension .obj ou .ply...");
     }
+
+    std::cout << "\n****Analyse de " << filename << "****\n" << std::endl;
 }
 
 void SurfaceMesh::displaySurfaceMeshInfos() const {
@@ -80,7 +88,7 @@ void SurfaceMesh::displayValencyInfos(const std::map<vertex_descriptor, int>& ve
     }
 }
 
-void SurfaceMesh::exportVerticesValencyAsCSV(const std::tuple<std::map<vertex_descriptor, int>, int>& data, const std::string csvFileName) {
+void SurfaceMesh::exportVerticesValencyAsCSV(const std::tuple<std::map<vertex_descriptor, int>, int>& data, const std::string csvFilename) {
     // Comme l'objectif est de pouvoir exporter les données de sorte à pouvoir réaliser un histogramme, nous allons préparer ces dernières
     // de sorte à pouvoir afficher un histogramme représentant le nombre de sommets en fonction de leur valence
     // Extraction des données contenues dans le tuple
@@ -99,8 +107,10 @@ void SurfaceMesh::exportVerticesValencyAsCSV(const std::tuple<std::map<vertex_de
     }
 
     // Création du fichier d'exportation
+    // Création du nom du fichier d'exportation
+    const std::string csv_filename = this->m_mesh_name + csvFilename;
     // Ouverture du fichier en mode écriture
-    std::ofstream csvOutputFile(csvFileName);
+    std::ofstream csvOutputFile(csv_filename);
 
     // Si le fichier ne s'est pas créé correctement
     if (!csvOutputFile.is_open()) {
@@ -118,6 +128,17 @@ void SurfaceMesh::exportVerticesValencyAsCSV(const std::tuple<std::map<vertex_de
         // Fermeture du fichier CSV
         csvOutputFile.close();
         std::cout << "Exportation des données de valence réussie." << std::endl;
+    }
+
+    // Déplacement du fichier .csv dans le dossier "diagrammes" du projet
+    // Préparation de la commande système permettant le déplacement
+    std::string command = "mv " + csv_filename + " ../diagrammes";
+    // Exécution de la commande
+    int result = system(command.c_str());
+
+    if(result != 0){
+        std::cerr << "Une erreur s'est produite lors du déplacement du fichier " << csv_filename << " vers le dossier 'diagrammes'...";
+        exit(1);
     }
 }
 
@@ -198,7 +219,7 @@ void SurfaceMesh::displayDihedralAnglesInfos(const std::map<face_descriptor, std
     }
 }
 
-void SurfaceMesh::exportDihedralAnglesAsCSV(std::map<face_descriptor, std::vector<double>>& dihedral_angles, const std::string csvFileName) {
+void SurfaceMesh::exportDihedralAnglesAsCSV(std::map<face_descriptor, std::vector<double>>& dihedral_angles, const std::string csvFilename) {
     // Nous allons nous servir pour créer le fichier CSV de la table de propriété de la classe m_dihedral_angles contenant l'ensemble des angles dièdres entre faces adjacentes
 
     // Comme l'objectif est de pouvoir exporter les données de sorte à pouvoir réaliser un histogramme, nous allons préparer ces dernières
@@ -229,8 +250,10 @@ void SurfaceMesh::exportDihedralAnglesAsCSV(std::map<face_descriptor, std::vecto
     }
 
     // Création du fichier d'exportation
+    // Création du nom du fichier d'exportation
+    const std::string csv_filename = this->m_mesh_name + csvFilename;
     // Ouverture du fichier en mode écriture
-    std::ofstream csvOutputFile(csvFileName);
+    std::ofstream csvOutputFile(csv_filename);
 
     // Si le fichier ne s'est pas créé correctement
     if (!csvOutputFile.is_open()) {
@@ -249,6 +272,17 @@ void SurfaceMesh::exportDihedralAnglesAsCSV(std::map<face_descriptor, std::vecto
         // Fermeture du fichier CSV
         csvOutputFile.close();
         std::cout << "Exportation des données des angles dièdres réussie." << std::endl;
+    }
+
+    // Déplacement du fichier .csv dans le dossier "diagrammes" du projet
+    // Préparation de la commande système permettant le déplacement
+    std::string command = "mv " + csv_filename + " ../diagrammes";
+    // Exécution de la commande
+    int result = system(command.c_str());
+
+    if(result != 0){
+        std::cerr << "Une erreur s'est produite lors du déplacement du fichier " << csv_filename << " vers le dossier 'diagrammes'...";
+        exit(1);
     }
 }
 
@@ -356,15 +390,17 @@ std::map<vertex_descriptor, double> SurfaceMesh::computeGaussianCurvature(std::m
     return vertex_gaussian_curvature;
 }
 
-void SurfaceMesh::exportGaussianCurvatureAsOBJ(std::map<vertex_descriptor, double>& vertex_gaussian_curvature, const std::string objFileName, bool is_decimated) {
+void SurfaceMesh::exportGaussianCurvatureAsOBJ(std::map<vertex_descriptor, double>& vertex_gaussian_curvature, const std::string objFilename, bool is_decimated) {
     // Construction d'un fichier obj stockant à la fois les coordonnées des sommets et les couleurs de chacun d'entre eux
     // Sur Blender par exemple, les couleurs des sommets peuvent être voir en passant en mode "Vertex Paint"
     
     // Récupération de la table de propriété des coordonnées des sommets du maillage
     Surface_mesh::Property_map<vertex_descriptor, Point_3> vertices_coordinates = m_surface_mesh.property_map<vertex_descriptor, Point_3>("v:point").first;
     // Création du fichier d'exportation
+    // Création du nom du fichier d'exportation
+    const std::string obj_filename = this->m_mesh_name + objFilename;
     // Ouverture du fichier en mode écriture
-    std::ofstream objOutputFile(objFileName);
+    std::ofstream objOutputFile(obj_filename);
 
     // Si le fichier ne s'est pas créé correctement
     if (!objOutputFile.is_open()) {
@@ -374,14 +410,14 @@ void SurfaceMesh::exportGaussianCurvatureAsOBJ(std::map<vertex_descriptor, doubl
         // Nous commençons par écrire l'en-tête de ce fichier
         objOutputFile << "# OBJ file generated with gaussian curvature infos\n# https://github.com/DevDarkstar/Traitement-maillage-CGAL\no Mesh\n";
         // Remplissage du fichier avec les coordonnées des sommets du maillage ainsi que les couleurs déterminées selon la courbure gaussienne
-        for (vertex_descriptor v : m_surface_mesh.vertices()) {
+        for (const auto& vertex : m_surface_mesh.vertices()) {
             // Récupération des coordonnées du sommet
-            Point_3 coordinates = vertices_coordinates[v];
+            Point_3 coordinates = vertices_coordinates[vertex];
             // écriture des coordonnées dans le fichier OBJ
             objOutputFile << "v " << coordinates.x() << " " << coordinates.y() << " " << coordinates.z() << " ";
 
             // Récupération de la courbure gaussienne de ce sommet
-            double gaussian_curvature = vertex_gaussian_curvature[v];
+            double gaussian_curvature = vertex_gaussian_curvature[vertex];
             // et stockage de la couleur associée à ce sommet en angle de la courbure
             // Si la valeur est supérieur strictement à 0.9, le sommet sera blanc
             if (gaussian_curvature > 5) {
@@ -427,7 +463,7 @@ void SurfaceMesh::exportGaussianCurvatureAsOBJ(std::map<vertex_descriptor, doubl
         // Si nous utilisons les indices des sommets contenus dans la surface mesh (cas avant l'algorithme de décimation)
         if (!is_decimated) {
             // Remplissage du fichier obj avec les indices des sommets des faces du maillage
-            for (face_descriptor f : m_surface_mesh.faces()) {
+            for (const auto& f : m_surface_mesh.faces()) {
                 // Récupération des sommets composants cette face
                 //std::vector<vertex_descriptor> vertices = m_face_vertices[f];
                 objOutputFile << "f ";
@@ -444,12 +480,12 @@ void SurfaceMesh::exportGaussianCurvatureAsOBJ(std::map<vertex_descriptor, doubl
             // Récupération des nouveaux indices des sommets restants après l'algorithme de décimation
             std::map<vertex_descriptor, int> vertex_indices = this->getIndicesRemapping();
 
-            for(face_descriptor f : m_surface_mesh.faces()) {
+            for(const auto& f : m_surface_mesh.faces()) {
                 // Et écriture de leur indice dans le fichier en utilisant les nouvelles valeurs contenues dans vertex_indices
                 objOutputFile << "f ";
                 // Pour ce faire, nous reparcourons les sommets composant une face en utilisant cette fois le méthode vertices_around_face
-                for(vertex_descriptor v : vertices_around_face(m_surface_mesh.halfedge(f), m_surface_mesh)) {
-                    objOutputFile << vertex_indices[v] << " ";
+                for(const auto& vertex : vertices_around_face(m_surface_mesh.halfedge(f), m_surface_mesh)) {
+                    objOutputFile << vertex_indices[vertex] << " ";
                 }
                 objOutputFile << "\n";
             }
@@ -458,6 +494,17 @@ void SurfaceMesh::exportGaussianCurvatureAsOBJ(std::map<vertex_descriptor, doubl
         // Fermeture du fichier OBJ
         objOutputFile.close();
         std::cout << "Création du fichier OBJ relatif aux courbures gaussiennes réussie." << std::endl;
+    }
+
+    // Déplacement du fichier .obj dans le dossier "maillages" du projet
+    // Préparation de la commande système permettant le déplacement
+    std::string command = "mv " + obj_filename + " ../maillages";
+    // Exécution de la commande
+    int result = system(command.c_str());
+
+    if(result != 0){
+        std::cerr << "Une erreur s'est produite lors du déplacement du fichier " << obj_filename << " vers le dossier 'maillages'...";
+        exit(1);
     }
 }
 

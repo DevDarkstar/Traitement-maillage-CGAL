@@ -28,14 +28,14 @@ class SurfaceMesh{
     void displaySurfaceMeshInfos() const; // Affichage du nombre de sommets et de faces de l'attribut de la classe Surface_mesh
     std::tuple<std::map<vertex_descriptor, int>, int> computeVerticesValency(); // Calcul de la valence des sommets du maillage (retourne un tuple contenant la table associant à chaque sommet sa valence correspondante, ainsi que la valeur de valence maximum)
     void displayValencyInfos(const std::map<vertex_descriptor, int>& vertex_valency) const; // Affiche dans la console le nom des sommets du maillage avec la valence qui leur est associée (pour débuggage)
-    void exportVerticesValencyAsCSV(const std::tuple<std::map<vertex_descriptor, int>, int>& data, const std::string csv_filename); // Exportation des valences des sommets du maillage au format CSV
+    void exportVerticesValencyAsCSV(const std::tuple<std::map<vertex_descriptor, int>, int>& data, const std::string csvFilename); // Exportation des valences des sommets du maillage au format CSV
     std::tuple<std::map<face_descriptor, std::vector<double>>, std::map<face_descriptor, Vector_3>> computeDihedralAngles(); // Calcul des angles dièdres entre les faces adjacentes entre elles
     void displayDihedralAnglesInfos(const std::map<face_descriptor, std::vector<double>>& dihedral_angles) const; // Affiche dans la console le nom des faces du maillage et, pour chacune d'entre elles, la liste des faces d'indice plus elevé qui lui sont associées ainsi que la valeur de l'angle dièdre (en degré) entre ces deux faces
-    void exportDihedralAnglesAsCSV(std::map<face_descriptor, std::vector<double>>& dihedral_angles, const std::string csv_filename); // Exportation des valeurs des angles dièdres en fonction du nombre d'occurrences au format CSV
+    void exportDihedralAnglesAsCSV(std::map<face_descriptor, std::vector<double>>& dihedral_angles, const std::string csvFilename); // Exportation des valeurs des angles dièdres en fonction du nombre d'occurrences au format CSV
     std::map<face_descriptor, double> computeFaceArea(std::map<face_descriptor, Vector_3>& face_normal); // Calcul de l'aire des faces du maillage
     void displayFaceAreaInfos(const std::map<face_descriptor, double>& face_area); // Affiche la l'identifiant des faces du maillage et l'aire qui leur est associée
     std::map<vertex_descriptor, double> computeGaussianCurvature(std::map<face_descriptor, double>& face_area, std::map<face_descriptor, Vector_3>& face_normal); // Calcul de l'approximation de la courbure gaussienne à chaque sommet du maillage
-    void exportGaussianCurvatureAsOBJ(std::map<vertex_descriptor, double>& vertex_gaussian_curvature, const std::string filename, bool is_decimated); // Exportation du maillage avec un code couleur associé aux courbures gaussiennes de chaque sommet dans un fichier OBJ
+    void exportGaussianCurvatureAsOBJ(std::map<vertex_descriptor, double>& vertex_gaussian_curvature, const std::string objFilename, bool is_decimated); // Exportation du maillage avec un code couleur associé aux courbures gaussiennes de chaque sommet dans un fichier OBJ
     void triangulated_surface_mesh_simplification(); // Application de l'algorithme de décimation sur la surface mesh contenue dans l'attribut m_surface_mesh
     std::map<vertex_descriptor, int> getIndicesRemapping(); // Permet de redéfinir les indices associés aux sommets de la surface mesh après l'algorithme de décimation
     void readPlyFile(const std::string& filepath, bool preload_into_memory); // Lecture d'un fichier au format .ply en utilisant tinyply
@@ -46,6 +46,8 @@ class SurfaceMesh{
     Surface_mesh m_surface_mesh;
     // Facteur de décimation utilisé dans l'algorithme de décimation du maillage
     float m_decimation_factor;
+    // Nom du maillage
+    std::string m_mesh_name;
     // Valence maximum et minimum des sommets du maillage (utilisés pour le fichier CSV)
     //int m_min_valency;
     //int m_max_valency;
