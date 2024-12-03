@@ -1,6 +1,10 @@
 #include "SurfaceMesh.hpp"
 
-//cmake -DCGAL_DIR=/home/richard/Documents/CGAL-5.6 -DCMAKE_BUILD_TYPE=Release ..
+// Installations requises des bibliothèques ou modules suivantes pour pouvoir compiler le projet
+// mpfr (sudo apt install libmpfr-dev)
+// gmp (sudo apt install libgmp-dev)
+// boost (sudo apt install libboost-all-dev)
+// matplotlib (sudo apt install python3-matplotlib)
 
 int main(int argc, char* argv[]){
     // Récupération du nom du fichier .obj
