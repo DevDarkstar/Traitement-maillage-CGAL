@@ -33,7 +33,7 @@ with open(filename, newline='', encoding='utf-8') as csvfile:
 
     # Ajout des valeurs au-dessus de chaque barre
     for i, valeur in enumerate(y_data):
-        plt.text(i, valeur + 0.5, str(valeur), ha='center', va='bottom', fontsize=10)       
+        plt.text(i, valeur + 0.01, str(valeur), ha='center', va='bottom', fontsize=10)       
     
     plt.xlabel(x_col)
     plt.ylabel(y_col)
