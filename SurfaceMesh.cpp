@@ -39,7 +39,7 @@ SurfaceMesh::SurfaceMesh(const std::string& filepath, float decimation_factor) :
 void SurfaceMesh::displaySurfaceMeshInfos() const {
     // Affichage du nombre de sommets et de faces du maillage
     // Première solution en utilisant les fonctions number_of_vertices et number_of_faces
-    std::cout << "Nombre de sommets de de faces du maillage :" << std::endl;
+    std::cout << "Nombre de sommets et de faces du maillage :" << std::endl;
     std::cout << "Nombres de sommets : " << this->m_surface_mesh.number_of_vertices() << std::endl;
     std::cout << "Nombres de faces : " << this->m_surface_mesh.number_of_faces() << std::endl;
     std::cout << std::endl;
@@ -326,7 +326,6 @@ void SurfaceMesh::displayFaceAreaInfos(const std::map<face_descriptor, double>& 
 }
 
 std::map<vertex_descriptor, double> SurfaceMesh::computeGaussianCurvature(std::map<face_descriptor, double>& face_area, std::map<face_descriptor, Vector_3>& face_normal) {
-    //m_vertex_gaussian_curvature.clear();
     // La technique utilisée ici est une approche en approximant la courbure gaussienne de chaque sommet du maillage en utilisant 
     // les normales et les aires des faces
     // Comme nous allons utiliser l'aire des faces dans ce calcul et que le résultat de la courbure y est directement lié,
@@ -337,11 +336,6 @@ std::map<vertex_descriptor, double> SurfaceMesh::computeGaussianCurvature(std::m
     // Calcul des approximations de courbure gaussienne (le résultat sera stocké dans la table de propriété vertex_gaussian_curvature)
     // Parcours de l'ensemble des sommets du maillage 
     for (const auto& vertex : this->m_surface_mesh.vertices()) {
-        /*if(m_surface_mesh.is_border(vertex)){
-            std::cout << "Sommet de bord" << std::endl;
-        } else {
-            std::cout << "Pas sommet de bord" << std::endl;
-        }*/
         // Création d'une variable pour la somme des angles entre normales
         double angle_sum = 0.0;
         // Création d'une variable pour la somme des aires des faces ayant ce sommet comme membre
@@ -349,6 +343,7 @@ std::map<vertex_descriptor, double> SurfaceMesh::computeGaussianCurvature(std::m
         // Récupération d'une demi-arête ayant ce sommet comme target
         halfedge_descriptor he_target = this->m_surface_mesh.halfedge(vertex);
         // Parcours de l'ensemble des demi-arêtes autour de ce sommet
+        //utilisation d'un compteur sur la face contenant la demi-arête ayant le sommet vertex comme cible
         for (const auto& he : this->m_surface_mesh.halfedges_around_target(he_target)) {
             // Si l'arête contenant cette demi-arête n'est pas une arête de bord du maillage
             if (!this->m_surface_mesh.is_border(this->m_surface_mesh.edge(he))) {
@@ -356,8 +351,8 @@ std::map<vertex_descriptor, double> SurfaceMesh::computeGaussianCurvature(std::m
                 face_descriptor f1 = this->m_surface_mesh.face(he);
                 face_descriptor f2 = this->m_surface_mesh.face(this->m_surface_mesh.opposite(he));
 
-                // Ajout de l'aire de la deuxième face à la somme des aires
-                area_sum += face_area[f1];
+                // Ajout de la moyenne des aires faces partageant cette arêre à la somme des aires
+                area_sum += ((face_area[f1] + face_area[f2]) / 2);
 
                 // Récupération des normales à ces deux faces
                 Vector_3 n1 = face_normal[f1];
@@ -396,10 +391,6 @@ std::map<vertex_descriptor, double> SurfaceMesh::computeGaussianCurvature(std::m
         vertex_gaussian_curvature[vertex] /= average_area;
     }
 
-    // Affichage des résultats (débogage)
-    /*for (vertex_descriptor vertex : m_surface_mesh.vertices()) {
-        std::cout << "Sommet " << vertex << ", courbure gaussienne: " << vertex_gaussian_curvature[vertex] << std::endl;
-    }*/
     return vertex_gaussian_curvature;
 }
 
@@ -441,31 +432,31 @@ void SurfaceMesh::exportGaussianCurvatureAsOBJ(std::map<vertex_descriptor, doubl
                 objOutputFile << 1 << " " << 0 << " " << 1 << "\n";
             }
             // Sinon si la valeur est supérieur strictement à 0.7 et le sommet sera de couleur rouge
-            else if (gaussian_curvature > 1.5) {
+            else if (gaussian_curvature > 2.25) {
                 objOutputFile << 1 << " " << 0 << " " << 0 << "\n";
             }
             // Sinon si la valeur est supérieur strictement à 0.6 et le sommet sera de couleur orange
-            else if (gaussian_curvature > 1) {
+            else if (gaussian_curvature > 1.5) {
                 objOutputFile << 1 << " " << 0.5 << " " << 0 << "\n";
             }
             // Sinon si la valeur est supérieur strictement à 0.5 et le sommet sera de couleur jaune
-            else if (gaussian_curvature > 0.75) {
+            else if (gaussian_curvature > 1) {
                 objOutputFile << 1 << " " << 1 << " " << 0 << "\n";
             }
             // Sinon si la valeur est supérieur strictement à 0.4 et le sommet sera de couleur vert clair
-            else if (gaussian_curvature > 0.5) {
+            else if (gaussian_curvature > 0.75) {
                 objOutputFile << 0.5 << " " << 1 << " " << 0 << "\n";
             }
             // Sinon si la valeur est supérieur strictement à 0.3 et le sommet sera de couleur verte
-            else if (gaussian_curvature > 0.25) {
+            else if (gaussian_curvature > 0.5) {
                 objOutputFile << 0 << " " << 1 << " " << 0 << "\n";
             }
             // Sinon si la valeur est supérieur strictement à 0.2 et le sommet sera de couleur cyan
-            else if (gaussian_curvature > 0.125) {
+            else if (gaussian_curvature > 0.25) {
                 objOutputFile << 0 << " " << 1 << " " << 1 << "\n";
             }
             // Sinon si la valeur est supérieur strictement à 0.1 et le sommet sera de couleur bleue
-            else if (gaussian_curvature > 0.075) {
+            else if (gaussian_curvature > 0.125) {
                 objOutputFile << 0 << " " << 0 << " " << 1 << "\n";
             }
             // Sinon le sommet sera de couleur noire
